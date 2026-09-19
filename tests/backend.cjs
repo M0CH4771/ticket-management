@@ -4,8 +4,17 @@ class Sheet{constructor(){this.r=[]}appendRow(r){this.r.push(r.map(String))}getD
 const ss={insertSheet:n=>tables[n]=new Sheet(),getSheetByName:n=>tables[n],getUrl:()=>'',getId:()=> 'test'};
 const context=vm.createContext({console:{log(){}},SpreadsheetApp:{create:()=>ss,openById:()=>ss,flush(){}},PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k],setProperty:(k,v)=>props[k]=v})},Utilities:{getUuid:()=>String(++uid).padStart(36,'0'),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s)=>Array.from(crypto.createHash('sha256').update(s).digest())},LockService:{getScriptLock:()=>({tryLock:()=>true,waitLock(){},releaseLock(){}})}});
 vm.runInContext(fs.readFileSync(__dirname+'/../Code.gs','utf8'),context);
-const c=context;c.setup_();const key='a'.repeat(72),other='b'.repeat(72);
-tables.Members.appendRow(['me','Alice',c.hash_(key),'yes']);tables.Members.appendRow(['other','Bob',c.hash_(other),'yes']);
+const c=context;c.setup_();c.setup_(); // Idempotent, safe for repeated first loads.
+assert.equal(c.getMembers().length,0);
+const alice=c.registerMember('Alice'),bob=c.registerMember('Bob');
+const key=alice.id,other=bob.id;
+assert.equal(c.getMembers().length,2);
+assert.equal(Object.keys(c.getMembers()[0]).sort().join(','),'id,name');
+assert.throws(()=>c.registerMember(' alice '));
+assert.throws(()=>c.registerMember('Ａｌｉｃｅ'));
+assert.throws(()=>c.registerMember('   '));
+assert.throws(()=>c.registerMember('a'.repeat(41)));
+assert.equal(c.getData(other).me.name,'Bob'); // Name selection is deliberately not authentication.
 assert.throws(()=>c.getData('invalid'));
 let d=c.saveData(key,'live',{title:'ライブ',date:'2026-10-01',venue:'会場'});const liveId=d.lives[0].id;
 c.saveData(key,'attendance',{liveId,status:'参戦'});
@@ -38,5 +47,15 @@ assert.equal(live.purchaseUrl,'https://example.com/tickets?id=12&event=3');
 for(const purchaseUrl of ['javascript:alert(1)','https://','data:text/html,test']) assert.throws(()=>c.saveData(key,'live',{...live,purchaseUrl}));
 live=c.saveData(key,'live',{...live,purchaseUrl:''}).lives[0];assert.equal(live.purchaseUrl,'');
 console.log('PASS: purchase URL persistence, validation, clearing, migration');
+live=c.saveData(key,'live',{...live,groups:['グループA','グループB','グループA']}).lives[0];
+assert.equal(live.groups.join(','),'グループA,グループB');
+assert.equal(c.getData(other).groups.join(','),'グループA,グループB');
+assert.throws(()=>c.saveData(key,'live',{...live,groups:Array(21).fill('グループ')}));
+assert.throws(()=>c.saveData(key,'live',{...live,groups:['']}));
+assert.throws(()=>c.saveData(key,'live',{...live,groups:['bad,name']}));
+live=c.saveData(key,'live',{...live,groups:['グループB']}).lives[0];
+assert.equal(live.groups.join(','),'グループB');
+live=c.saveData(key,'live',{...live,groups:[]}).lives[0];assert.equal(live.groups.length,0);
+console.log('PASS: reusable group tags, deduplication, validation, deselection and clearing');
 tables.Members.r[1][3]='no';assert.throws(()=>c.getData(key));
-console.log('PASS: authentication, ownership, attendance, batch creation, duplicate rejection, transfer status, stale edits, unissued tickets, deletion, revocation');
+console.log('PASS: name registration and selection, selected-member ownership, attendance, batch creation, duplicate rejection, transfer status, stale edits, unissued tickets, deletion, revocation');

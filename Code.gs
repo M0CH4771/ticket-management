@@ -1,37 +1,77 @@
 const TABLES = {
-  Lives: ['id','title','date','venue','sheetUrl','memo','owner','version','lotteryDeadline','requiredThrows','purchaseUrl'],
+  Lives: ['id','title','date','venue','sheetUrl','memo','owner','version','lotteryDeadline','requiredThrows','purchaseUrl','groups'],
   Members: ['id','name','tokenHash','active'],
   Attendance: ['id','liveId','memberId','status','version'],
   Tickets: ['id','liveId','memberId','number','status','recipient','memo','version'],
 };
-function doGet() { return HtmlService.createHtmlOutputFromFile('Index').setTitle('LIVE POCKET').addMetaTag('viewport','width=device-width, initial-scale=1'); }
-// Run once from the Apps Script editor. No credentials are returned to web clients.
+function doGet() { ensureReady_(); return HtmlService.createHtmlOutputFromFile('Index').setTitle('LIVE POCKET').addMetaTag('viewport','width=device-width, initial-scale=1, viewport-fit=cover'); }
+// Initial setup runs automatically when the web app is first opened.
 function setup_() {
-  const p = PropertiesService.getScriptProperties();
-  if (p.getProperty('SHEET_ID')) throw new Error('初期設定済みです');
-  const ss = SpreadsheetApp.create('LIVE POCKET 管理');
-  Object.keys(TABLES).forEach(name => { const s = ss.insertSheet(name); s.getRange(1,1,s.getMaxRows(),TABLES[name].length).setNumberFormat('@'); s.appendRow(TABLES[name]); s.setFrozenRows(1); s.getRange(1,1,1,TABLES[name].length).setFontWeight('bold').setBackground('#dde8ff'); });
-  p.setProperty('SHEET_ID', ss.getId());
-  console.log('管理スプレッドシート: '+ss.getUrl());
+  const lock=LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const p=PropertiesService.getScriptProperties();
+    if(p.getProperty('SHEET_ID')) return;
+    const ss=SpreadsheetApp.create('LIVE POCKET 管理');
+    Object.keys(TABLES).forEach(name=>{
+      const s=ss.insertSheet(name);
+      s.getRange(1,1,s.getMaxRows(),TABLES[name].length).setNumberFormat('@');
+      s.appendRow(TABLES[name]); s.setFrozenRows(1);
+      s.getRange(1,1,1,TABLES[name].length).setFontWeight('bold').setBackground('#dde8ff');
+    });
+    p.setProperty('SHEET_ID',ss.getId());
+    p.setProperty('SCHEMA_VERSION','name-selection-v2');
+    console.log('管理スプレッドシート: '+ss.getUrl());
+  } finally { lock.releaseLock(); }
 }
-// Edit name and run from the editor for each member. Keep the issued key private.
-function issueMember_() {
-  const name = '幹事';
-  const key = Utilities.getUuid() + Utilities.getUuid();
-  sheet_('Members').appendRow([Utilities.getUuid(),name,hash_(key),'yes']);
-  console.log(name+' のメンバーキー: '+key);
+function ensureReady_() {
+  const p=PropertiesService.getScriptProperties();
+  if(!p.getProperty('SHEET_ID')) setup_();
+  if(p.getProperty('SCHEMA_VERSION')!=='name-selection-v2') {
+    migrateLives_(); p.setProperty('SCHEMA_VERSION','name-selection-v2');
+  }
+}
+function getMembers() {
+  ensureReady_();
+  return rows_('Members').filter(m=>m.active==='yes').map(m=>({id:m.id,name:m.name})).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+}
+function normalizedName_(name) { return String(name).normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase(); }
+function registerMember(name) {
+  ensureReady_();
+  const lock=LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const displayName=text_(name,40,true).normalize('NFKC').replace(/\s+/g,' ');
+    if(rows_('Members').some(m=>normalizedName_(m.name)===normalizedName_(displayName))) throw new Error('その名前は登録済みです。一覧から選ぶか、区別できる名前にしてください');
+    const member={id:Utilities.getUuid(),name:displayName,tokenHash:'',active:'yes'};
+    write_('Members',member,null); SpreadsheetApp.flush();
+    return {id:member.id,name:member.name};
+  } finally { lock.releaseLock(); }
 }
 function sheet_(name) { return SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID')).getSheetByName(name); }
 function rows_(name) { return sheet_(name).getDataRange().getDisplayValues().slice(1).map(r => Object.fromEntries(TABLES[name].map((k,i)=>[k,r[i]??'']))); }
-function hash_(s) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,s).map(b=>('0'+((b+256)%256).toString(16)).slice(-2)).join(''); }
-function auth_(key) {
-  if (typeof key !== 'string' || key.length < 60 || key.length > 100) throw new Error('メンバーキーを確認してください');
-  const me = rows_('Members').find(x=>x.active==='yes' && x.tokenHash===hash_(key));
-  if (!me) throw new Error('メンバーキーが無効です');
+// A selected name is a convenience label, not authentication.
+// Anyone with the app URL can select any active member.
+function selectedMember_(memberId) {
+  if(typeof memberId!=='string') throw new Error('名前を選び直してください');
+  const me=rows_('Members').find(m=>m.active==='yes'&&m.id===memberId);
+  if(!me) throw new Error('名前を選び直してください');
   return me;
 }
-function snapshot_(me) { return {me:{id:me.id,name:me.name},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives:rows_('Lives'),attendance:rows_('Attendance'),tickets:rows_('Tickets'),updatedAt:new Date().toISOString()}; }
-function getData(key) { return snapshot_(auth_(key)); }
+function readGroups_(value) {
+  if(Array.isArray(value)) return value;
+  try { const parsed=JSON.parse(value||'[]'); return Array.isArray(parsed)?parsed.filter(x=>typeof x==='string'):[]; } catch(e) { return []; }
+}
+function validateGroups_(value) {
+  if(!Array.isArray(value)||value.length>20) throw new Error('出演グループは20組まで選択できます');
+  const names=value.map(v=>text_(v,40,true).normalize('NFKC').replace(/\s+/g,' '));
+  if(names.some(n=>/[,、\n\r]/.test(n))) throw new Error('グループ名にカンマ・改行は使えません');
+  return [...new Map(names.map(n=>[n.toLowerCase(),n])).values()];
+}
+function snapshot_(me) {
+  const lives=rows_('Lives').map(l=>({...l,groups:readGroups_(l.groups)}));
+  const groups=[...new Set(lives.flatMap(l=>l.groups))].sort((a,b)=>a.localeCompare(b,'ja'));
+  return {me:{id:me.id,name:me.name},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives,groups,attendance:rows_('Attendance'),tickets:rows_('Tickets'),updatedAt:new Date().toISOString()};
+}
+function getData(memberId) { return snapshot_(selectedMember_(memberId)); }
 function text_(value,max,required) { const s=String(value==null?'':value).trim(); if ((required&&!s)||s.length>max) throw new Error('入力内容・文字数を確認してください'); return s; }
 function deadline_(value) {
   const s=text_(value,10,false);
@@ -68,10 +108,10 @@ function write_(table,row,old) {
   if (!old) s.appendRow(vals);
   else { const index=rows_(table).findIndex(x=>x.id===old.id); if(index<0) throw new Error('データが見つかりません'); s.getRange(index+2,1,1,vals.length).setValues([vals]); }
 }
-function saveData(key,action,payload) {
+function saveData(memberId,action,payload) {
   const lock=LockService.getScriptLock(); if(!lock.tryLock(10000)) throw new Error('更新が混み合っています。少し待って再度保存してください');
   try {
-    const me=auth_(key); const p=payload||{};
+    const me=selectedMember_(memberId); const p=payload||{};
     if (action==='live') {
       const old=p.id?rows_('Lives').find(x=>x.id===p.id):null;
       if(p.id&&!old) throw new Error('ライブが見つかりません');
@@ -79,7 +119,7 @@ function saveData(key,action,payload) {
       if(old && String(p.version)!==old.version) throw new Error('他の更新がありました。再読込してください');
       const date=text_(p.date,10,true); if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||isNaN(Date.parse(date))) throw new Error('日付を確認してください');
       const url=text_(p.sheetUrl,600,false); if(url&&!/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url)) throw new Error('スプレッドシートURLを確認してください');
-      write_('Lives',{id:old?old.id:Utilities.getUuid(),title:text_(p.title,120,true),date,purchaseUrl:purchaseUrl_(p.purchaseUrl===undefined?old?.purchaseUrl:p.purchaseUrl),lotteryDeadline:deadline_(p.lotteryDeadline===undefined?old?.lotteryDeadline:p.lotteryDeadline),requiredThrows:throws_(p.requiredThrows===undefined?old?.requiredThrows:p.requiredThrows),venue:text_(p.venue,120,false),sheetUrl:url,memo:text_(p.memo,500,false),owner:me.id,version:old?Number(old.version)+1:1},old);
+      write_('Lives',{id:old?old.id:Utilities.getUuid(),title:text_(p.title,120,true),date,groups:JSON.stringify(validateGroups_(p.groups===undefined?readGroups_(old?.groups):p.groups)),purchaseUrl:purchaseUrl_(p.purchaseUrl===undefined?old?.purchaseUrl:p.purchaseUrl),lotteryDeadline:deadline_(p.lotteryDeadline===undefined?old?.lotteryDeadline:p.lotteryDeadline),requiredThrows:throws_(p.requiredThrows===undefined?old?.requiredThrows:p.requiredThrows),venue:text_(p.venue,120,false),sheetUrl:url,memo:text_(p.memo,500,false),owner:me.id,version:old?Number(old.version)+1:1},old);
     } else {
       if(!rows_('Lives').some(x=>x.id===p.liveId)) throw new Error('ライブが見つかりません');
       if(action==='attendance') {
@@ -97,7 +137,7 @@ function saveData(key,action,payload) {
         const s=sheet_('Tickets');s.getRange(s.getLastRow()+1,1,values.length,TABLES.Tickets.length).setValues(values);
       } else if(action==='ticket' || action==='deleteTicket') {
         const old=rows_('Tickets').find(t=>t.id===p.id&&t.liveId===p.liveId);
-        if(!old||old.memberId!==me.id) throw new Error('自分のチケットのみ編集できます');
+        if(!old||old.memberId!==me.id) throw new Error('選択中の名前のチケットのみ編集できます');
         if(String(p.version)!==old.version) throw new Error('他の更新がありました。再読込してください');
         if(action==='deleteTicket') { sheet_('Tickets').deleteRow(rows_('Tickets').findIndex(t=>t.id===old.id)+2); }
         else {

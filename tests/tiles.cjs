@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const script=fs.readFileSync(__dirname+'/../Index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
-const c=vm.createContext({sessionStorage:{getItem:()=>''}});vm.runInContext(script.slice(0,script.indexOf('function updateDay()')),c);
+const c=vm.createContext({sessionStorage:{removeItem(){}},localStorage:{getItem:()=>''}});vm.runInContext(script.slice(0,script.indexOf('function updateDay()')),c);
 assert.equal(c.japanDay(new Date('2026-09-19T14:59:59Z')),'2026-09-19');
 assert.equal(c.japanDay(new Date('2026-09-19T15:00:00Z')),'2026-09-20');
 assert.equal(c.nextDay('2026-12-31'),'2027-01-01');
@@ -13,4 +13,6 @@ const after=c.eventTile(l,tickets,'2026-09-20');assert.ok(after.includes('全体
 assert.ok(c.eventTile({...l,lotteryDeadline:''},[],'2026-09-20').includes('抽選締切</dt><dd>未設定'));
 assert.ok(!c.safeLink('javascript:alert(1)','チケットURL').includes('href='));
 assert.ok(c.eventTile({...l,title:'<script>bad</script>'},[],'2026-09-19').includes('&lt;script&gt;'));
+assert.ok(c.eventTile({...l,groups:['グループA','<script>']},[],'2026-09-19').includes('グループA'));
+assert.ok(c.eventTile({...l,groups:['<script>']},[],'2026-09-19').includes('&lt;script&gt;'));
 console.log('PASS: priority ordering, Japan midnight, year rollover, cutoff day/next day tile content, remaining count, unset cutoff, safe links and escaping');
