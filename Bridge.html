@@ -1,0 +1,18 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>Ticket Management データ接続</title></head><body>
+<p>データ接続用のページです。チケット管理はGitHub Pagesのサイトを開いてください。</p>
+<script>
+const channel = <?!= JSON.stringify(channel) ?>;
+const parentOrigin = <?!= JSON.stringify(parentOrigin) ?>;
+const allowed = new Set(['getMembers','registerMember','getData','saveData']);
+const seen = new Set();
+window.addEventListener('message', event => {
+  const message = event.data;
+  if (event.source !== window.top || event.origin !== parentOrigin || !message || message.type !== 'live-pocket-call' || message.channel !== channel) return;
+  if (typeof message.id !== 'string' || !/^[a-f0-9-]{36}$/.test(message.id) || !allowed.has(message.method) || !Array.isArray(message.args)) return;
+  if (seen.has(message.id)) return;
+  seen.add(message.id);
+  const reply = payload => window.top.postMessage({type:'live-pocket-result',channel,id:message.id,...payload}, parentOrigin);
+  google.script.run.withSuccessHandler(value => reply({ok:true,value})).withFailureHandler(error => reply({ok:false,error:error.message || '処理に失敗しました'}))[message.method](...message.args);
+});
+if (channel && window.top !== window) window.top.postMessage({type:'live-pocket-ready',channel},parentOrigin);
+</script></body></html>

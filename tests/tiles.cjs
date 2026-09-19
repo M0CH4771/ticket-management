@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const script=fs.readFileSync(__dirname+'/../Index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
+const script=fs.readFileSync(__dirname+'/../docs/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
 const c=vm.createContext({sessionStorage:{removeItem(){}},localStorage:{getItem:()=>''}});vm.runInContext(script.slice(0,script.indexOf('function updateDay()')),c);
 assert.equal(c.japanDay(new Date('2026-09-19T14:59:59Z')),'2026-09-19');
 assert.equal(c.japanDay(new Date('2026-09-19T15:00:00Z')),'2026-09-20');

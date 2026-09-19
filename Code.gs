@@ -4,14 +4,22 @@ const TABLES = {
   Attendance: ['id','liveId','memberId','status','version'],
   Tickets: ['id','liveId','memberId','number','status','recipient','memo','version'],
 };
-function doGet() { ensureReady_(); return HtmlService.createHtmlOutputFromFile('Index').setTitle('LIVE POCKET').addMetaTag('viewport','width=device-width, initial-scale=1, viewport-fit=cover'); }
+function doGet(e) {
+  ensureReady_();
+  const channel=e?.parameter?.channel||'';
+  if(channel && !/^[a-f0-9-]{36}$/.test(channel)) throw new Error('接続パラメータが無効です');
+  const template=HtmlService.createTemplateFromFile('Bridge');
+  template.channel=channel;
+  template.parentOrigin='https://m0ch4771.github.io';
+  return template.evaluate().setTitle('Ticket Management データ接続').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
 // Initial setup runs automatically when the web app is first opened.
 function setup_() {
   const lock=LockService.getScriptLock(); lock.waitLock(10000);
   try {
     const p=PropertiesService.getScriptProperties();
     if(p.getProperty('SHEET_ID')) return;
-    const ss=SpreadsheetApp.create('LIVE POCKET 管理');
+    const ss=SpreadsheetApp.create('Ticket Management 管理');
     Object.keys(TABLES).forEach(name=>{
       const s=ss.insertSheet(name);
       s.getRange(1,1,s.getMaxRows(),TABLES[name].length).setNumberFormat('@');
