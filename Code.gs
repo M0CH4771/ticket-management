@@ -55,10 +55,64 @@ function ensureReady_() {
       Object.keys(TABLES).forEach(name=>sheet_(name).getRange(1,1,1,TABLES[name].length).setValues([HEADERS_JA[name]]).setFontWeight('bold').setBackground('#dde8ff'));
       p.setProperty('SCHEMA_VERSION','japanese-headers-v3');
     }
+    normalizeSheetDates_();
     fillSheetIds_();
+    deletePastEvents_();
     SpreadsheetApp.flush();
   } finally { lock.releaseLock(); }
 }
+// Dates without a year use the current Japan calendar year, then persist it.
+// Never infer a future year just because the month/day is already in the past.
+function japanToday_() { return Utilities.formatDate(new Date(),'Asia/Tokyo','yyyy-MM-dd'); }
+function normalizeDate_(value,year,timezone) {
+  if(Object.prototype.toString.call(value)==='[object Date]') {
+    return Number.isFinite(value.getTime())?Utilities.formatDate(value,timezone||'Asia/Tokyo','yyyy-MM-dd'):'';
+  }
+  const s=String(value??'').normalize('NFKC').trim();
+  const full=s.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+  const short=s.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if(!full&&!short) return '';
+  const y=full?Number(full[1]):Number(year),m=Number(full?full[2]:short[1]),d=Number(full?full[3]:short[2]);
+  if(!Number.isInteger(y)||y<1000||y>9999||m<1||m>12||d<1||d>31) return '';
+  const date=new Date(Date.UTC(y,m-1,d));
+  return date.getUTCFullYear()===y&&date.getUTCMonth()===m-1&&date.getUTCDate()===d?date.toISOString().slice(0,10):'';
+}
+function normalizeSheetDates_() {
+  const s=sheet_('Lives'),range=s.getDataRange(),raw=range.getValues();
+  const timezone=s.getParent().getSpreadsheetTimeZone(),year=Number(japanToday_().slice(0,4));
+  for(let i=1;i<raw.length;i++) {
+    const row=raw[i];
+    if(!String(row[1]||'').trim()) continue;
+    const eventDate=normalizeDate_(row[2],year,timezone);
+    // For January events, a yearless December deadline belongs to the preceding year.
+    const deadlineYear=eventDate?Number(eventDate.slice(0,4)):year;
+    let deadline=normalizeDate_(row[8],deadlineYear,timezone);
+    if(/^\d{1,2}\/\d{1,2}$/.test(String(row[8]||'').normalize('NFKC').trim()) && eventDate && deadline>eventDate)
+      deadline=normalizeDate_(row[8],deadlineYear-1,timezone);
+    [[2,eventDate],[8,deadline]].forEach(([col,date])=>{
+      if(date && row[col]!==date) s.getRange(i+1,col+1,1,1).setNumberFormat('@').setValues([[date]]);
+    });
+  }
+}
+function deletePastEvents_() {
+  const s=sheet_('Lives'),rows=s.getDataRange().getDisplayValues(),today=japanToday_();
+  // Delete bottom-up so blank rows, adjacent events and references cannot shift targets.
+  // Only event rows are deleted. Member, attendance and ticket records are retained.
+  for(let i=rows.length-1;i>=1;i--) {
+    const row=rows[i],date=normalizeDate_(row[2],Number(today.slice(0,4)));
+    if(String(row[1]||'').trim() && date && date<today) s.deleteRow(i+1);
+  }
+}
+// Run once in the Apps Script editor to authorize and enable unattended cleanup.
+function installDailyCleanup() {
+  const lock=LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    if(!ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()==='dailyCleanup'))
+      ScriptApp.newTrigger('dailyCleanup').timeBased().atHour(0).everyDays(1).inTimezone('Asia/Tokyo').create();
+  } finally { lock.releaseLock(); }
+  dailyCleanup();
+}
+function dailyCleanup() { ensureReady_(); }
 // Direct sheet entry: assign primary IDs only to complete event/name rows.
 // Foreign keys (event/member/owner references) are never guessed or overwritten.
 function fillSheetIds_() {
@@ -67,7 +121,7 @@ function fillSheetIds_() {
     const seen=new Set();
     rows.forEach(r=>{if(r[0]) {if(seen.has(r[0])) throw new Error(name+'のIDが重複しています。コピーして追加した行のIDを空欄にしてください'); seen.add(r[0]);}});
     rows.forEach((r,i)=>{
-      if(!r[1]?.trim() || (name==='Lives' && !/^\d{4}-\d{2}-\d{2}$/.test(r[2]||''))) return;
+      if(!r[1]?.trim() || (name==='Lives' && !normalizeDate_(r[2],Number(japanToday_().slice(0,4))))) return;
       if(!r[0]) {
         let id; do {id=Utilities.getUuid();} while(seen.has(id)); seen.add(id);
         s.getRange(i+2,1,1,1).setValues([[id]]);
@@ -114,7 +168,7 @@ function validateGroups_(value) {
   return [...new Map(names.map(n=>[n.toLowerCase(),n])).values()];
 }
 function snapshot_(me) {
-  const lives=rows_('Lives').filter(l=>l.id&&l.title&&l.date).map(l=>({...l,groups:readGroups_(l.groups)}));
+  const lives=rows_('Lives').filter(l=>l.id&&l.title&&normalizeDate_(l.date,Number(japanToday_().slice(0,4)))).map(l=>({...l,groups:readGroups_(l.groups)}));
   const groups=[...new Set(lives.flatMap(l=>l.groups))].sort((a,b)=>a.localeCompare(b,'ja'));
   return {me:{id:me.id,name:me.name},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives,groups,attendance:rows_('Attendance'),tickets:rows_('Tickets'),updatedAt:new Date().toISOString()};
 }
@@ -165,7 +219,8 @@ function saveData(memberId,action,payload) {
       if(p.id&&!old) throw new Error('ライブが見つかりません');
       if(old && old.owner!==me.id) throw new Error('ライブの編集は登録者のみ可能です');
       if(old && String(p.version)!==old.version) throw new Error('他の更新がありました。再読込してください');
-      const date=text_(p.date,10,true); if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||isNaN(Date.parse(date))) throw new Error('日付を確認してください');
+      const date=normalizeDate_(p.date,Number(japanToday_().slice(0,4))); if(!date) throw new Error('日付を確認してください');
+      if(date<japanToday_()) throw new Error('終了済みのイベントは登録できません');
       const url=text_(p.sheetUrl,600,false); if(url&&!/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url)) throw new Error('スプレッドシートURLを確認してください');
       write_('Lives',{id:old?old.id:Utilities.getUuid(),title:text_(p.title,120,true),date,groups:JSON.stringify(validateGroups_(p.groups===undefined?readGroups_(old?.groups):p.groups)),purchaseUrl:purchaseUrl_(p.purchaseUrl===undefined?old?.purchaseUrl:p.purchaseUrl),lotteryDeadline:deadline_(p.lotteryDeadline===undefined?old?.lotteryDeadline:p.lotteryDeadline),requiredThrows:throws_(p.requiredThrows===undefined?old?.requiredThrows:p.requiredThrows),venue:text_(p.venue,120,false),sheetUrl:url,memo:text_(p.memo,500,false),owner:me.id,version:old?Number(old.version)+1:1},old);
     } else {
