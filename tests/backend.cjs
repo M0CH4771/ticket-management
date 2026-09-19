@@ -31,7 +31,7 @@ c.saveData(key,'deleteTicket',{...d.tickets[0]});assert.equal(c.getData(key).tic
 tables.Lives.r=tables.Lives.r.map(r=>r.slice(0,8));
 const legacy=JSON.stringify(tables.Lives.r[1]);c.migrateLives_();c.migrateLives_();
 assert.equal(JSON.stringify(tables.Lives.r[1]),legacy);
-assert.equal(tables.Lives.r[0][8],'lotteryDeadline');
+assert.equal(tables.Lives.r[0][8],'抽選締切');
 let live=c.getData(key).lives[0];assert.equal(live.requiredThrows,'');
 live=c.saveData(key,'live',{...live,lotteryDeadline:'2026-09-25',requiredThrows:'30'}).lives[0];
 assert.equal(live.lotteryDeadline,'2026-09-25');assert.equal(live.requiredThrows,'30');
@@ -41,7 +41,7 @@ live=c.saveData(key,'live',{...live,requiredThrows:'0'}).lives[0];assert.equal(l
 live=c.saveData(key,'live',{...live,lotteryDeadline:'',requiredThrows:''}).lives[0];
 assert.equal(live.lotteryDeadline,'');assert.equal(live.requiredThrows,'');
 console.log('PASS: deadline and throw target save, validation, clearing, zero, legacy migration');
-assert.equal(tables.Lives.r[0][10],'purchaseUrl');
+assert.equal(tables.Lives.r[0][10],'チケット購入URL');
 live=c.saveData(key,'live',{...live,purchaseUrl:'https://example.com/tickets?id=12&event=3'}).lives[0];
 assert.equal(live.purchaseUrl,'https://example.com/tickets?id=12&event=3');
 for(const purchaseUrl of ['javascript:alert(1)','https://','data:text/html,test']) assert.throws(()=>c.saveData(key,'live',{...live,purchaseUrl}));
@@ -59,3 +59,27 @@ live=c.saveData(key,'live',{...live,groups:[]}).lives[0];assert.equal(live.group
 console.log('PASS: reusable group tags, deduplication, validation, deselection and clearing');
 tables.Members.r[1][3]='no';assert.throws(()=>c.getData(key));
 console.log('PASS: name registration and selection, selected-member ownership, attendance, batch creation, duplicate rejection, transfer status, stale edits, unissued tickets, deletion, revocation');
+
+// Spreadsheet bulk entry and header migration preserve IDs and related records.
+const oldTickets=JSON.stringify(tables.Tickets.r);
+const existingId=tables.Lives.r[1][0];
+tables.Lives.appendRow(['','まとめ登録','2026-11-01','会場','','',other,'','','5']);
+tables.Lives.appendRow([]);
+tables.Members.appendRow(['','新しいメンバー']);
+props.SCHEMA_VERSION='name-selection-v2';
+context._testTables=tables;
+vm.runInContext("Object.keys(TABLES).forEach(n=>{_testTables[n].r[0]=Array.from(TABLES[n]);});",context);
+c.ensureReady_();
+assert.equal(tables.Lives.r[0][1],'イベント名');
+assert.equal(tables.Members.r[0][1],'名前');
+assert.equal(tables.Lives.r[1][0],existingId);
+assert.equal(JSON.stringify(tables.Tickets.r),oldTickets);
+const imported=c.getData(other).lives.find(l=>l.title==='まとめ登録');
+assert.ok(imported.id);assert.equal(imported.version,'1');
+assert.ok(c.getMembers().find(m=>m.name==='新しいメンバー').id);
+assert.equal(tables.Lives.r[3][0],undefined);
+c.ensureReady_();assert.equal(c.getData(other).lives.find(l=>l.title==='まとめ登録').id,imported.id);
+c.saveData(other,'live',{...imported,title:'まとめ登録を編集'});
+tables.Lives.appendRow([existingId,'重複','2026-11-02']);
+assert.throws(()=>c.ensureReady_(),/IDが重複/);
+console.log('PASS: Japanese migration preserves data, bulk IDs persist, blank rows skipped, duplicates rejected, imported event editable');
