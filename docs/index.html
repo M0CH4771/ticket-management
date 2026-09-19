@@ -24,7 +24,20 @@ const badge=s=>`<span class="badge ${s==='余り'?'available':s==='取引中'?'p
 function notice(s){clearTimeout(noticeTimer);$('notice').textContent=s;const inline=$('form-message');if(inline)inline.textContent=s; if(s==='保存しました'){noticeTimer=setTimeout(()=>{$('notice').textContent=''},3000)}}
 function rpc(fn,...args){return window.LivePocketTransport.call(fn,...args)}
 async function refresh(){if(busy||$('modal').open)return;busy=true;notice('読み込み中…');let error='';try{data=await rpc('getData',memberId);notice('');render()}catch(e){error=e.message}finally{busy=false}if(error){if(!data){rememberMember('');await chooseMemberScreen()}notice(error)}}
-async function save(action,p){if(busy)return;busy=true;const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(el=>!el.disabled);controls.forEach(el=>el.disabled=true);notice('保存中…');try{data=await rpc('saveData',memberId,action,p);modalDirty=false;$('modal').close();render();notice('保存しました')}catch(e){if(action==='attendance')detail();notice(e.message)}finally{busy=false;controls.forEach(el=>el.disabled=false)}}
+function applySaveResult(current,result){
+  if(result?.kind!=='patch-v1')return result; // Compatible with the existing GAS deployment.
+  const next={...current,lastSavedAt:result.savedAt};
+  const fields={Lives:'lives',Tickets:'tickets',Attendance:'attendance'};
+  for(const [table,change] of Object.entries(result.changes)){
+    const field=fields[table];if(!field)continue;
+    const updates=new Map(change.upsert.map(row=>[row.id,row])),removed=new Set(change.remove);
+    next[field]=current[field].filter(row=>!removed.has(row.id)).map(row=>{const update=updates.get(row.id);updates.delete(row.id);return update||row});
+    next[field].push(...updates.values());
+  }
+  if(result.changes.Lives)next.groups=[...new Set(next.lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));
+  return next;
+}
+async function save(action,p){if(busy)return;busy=true;const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(el=>!el.disabled);controls.forEach(el=>el.disabled=true);notice('保存中…');try{data=applySaveResult(data,await rpc('saveData',memberId,action,p,{response:'patch-v1'}));modalDirty=false;$('modal').close();render();notice('保存しました')}catch(e){if(action==='attendance')detail();notice(e.message)}finally{busy=false;controls.forEach(el=>el.disabled=false)}}
 function rememberMember(id){memberId=id;try{if(id)localStorage.setItem('live-pocket-member',id);else localStorage.removeItem('live-pocket-member')}catch(e){}}
 function memberMessage(message){const el=$('member-message');if(el)el.textContent=message;else notice(message)}
 async function chooseMemberScreen(){
