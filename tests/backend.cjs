@@ -1,12 +1,13 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+const io={opens:0,ranges:0};
 const tables={};let uid=0;const props={};
 let now='2026-09-19T03:00:00Z';
 class Clock extends Date { constructor(...args){super(...(args.length?args:[now]));} }
 const triggers=[];const triggerOptions={};
 const triggerBuilder={timeBased(){return this},atHour(v){triggerOptions.hour=v;return this},everyDays(v){triggerOptions.days=v;return this},inTimezone(v){triggerOptions.zone=v;return this},create(){triggers.push({getHandlerFunction:()=> 'dailyCleanup'});return triggers.at(-1)}};
-class Sheet{constructor(){this.r=[]}appendRow(r){this.r.push(r.map(String))}getDataRange(){return{getValues:()=>this.r.map(r=>r.slice()),getDisplayValues:()=>this.r.map(r=>r.map(String))}}getParent(){return ss}getLastRow(){return this.r.length}getMaxRows(){return 1000}setFrozenRows(){}getRange(row,col,n,m){const api={setValues:v=>{v.forEach((r,i)=>{this.r[row-1+i]??=[];r.forEach((x,j)=>this.r[row-1+i][col-1+j]=String(x))});return api},setFontWeight:()=>api,setBackground:()=>api,setNumberFormat:()=>api};return api}deleteRow(n){this.r.splice(n-1,1)}}
+class Sheet{constructor(){this.r=[]}appendRow(r){this.r.push(r.map(String))}getDataRange(){io.ranges++;return{getValues:()=>this.r.map(r=>r.slice()),getDisplayValues:()=>this.r.map(r=>r.map(String))}}getParent(){return ss}getLastRow(){return this.r.length}getMaxRows(){return 1000}setFrozenRows(){}getRange(row,col,n,m){const api={setValues:v=>{v.forEach((r,i)=>{this.r[row-1+i]??=[];r.forEach((x,j)=>this.r[row-1+i][col-1+j]=String(x))});return api},setFontWeight:()=>api,setBackground:()=>api,setNumberFormat:()=>api};return api}deleteRow(n){this.r.splice(n-1,1)}}
 const ss={getSpreadsheetTimeZone:()=> 'Asia/Tokyo',insertSheet:n=>tables[n]=new Sheet(),getSheetByName:n=>tables[n],getUrl:()=>'',getId:()=> 'test'};
-const context=vm.createContext({Date:Clock,ScriptApp:{getProjectTriggers:()=>triggers,newTrigger:()=>triggerBuilder},console:{log(){}},SpreadsheetApp:{create:()=>ss,openById:()=>ss,flush(){}},PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k],setProperty:(k,v)=>props[k]=v})},Utilities:{formatDate:(d,tz)=>new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(d),getUuid:()=>String(++uid).padStart(36,'0'),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s)=>Array.from(crypto.createHash('sha256').update(s).digest())},LockService:{getScriptLock:()=>({tryLock:()=>true,waitLock(){},releaseLock(){}})}});
+const context=vm.createContext({Date:Clock,ScriptApp:{getProjectTriggers:()=>triggers,newTrigger:()=>triggerBuilder},console:{log(){}},SpreadsheetApp:{create:()=>ss,openById:()=>{io.opens++;return ss},flush(){}},PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k],setProperty:(k,v)=>props[k]=v})},Utilities:{formatDate:(d,tz)=>new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(d),getUuid:()=>String(++uid).padStart(36,'0'),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s)=>Array.from(crypto.createHash('sha256').update(s).digest())},LockService:{getScriptLock:()=>({tryLock:()=>true,waitLock(){},releaseLock(){}})}});
 vm.runInContext(fs.readFileSync(__dirname+'/../Code.gs','utf8'),context);
 const c=context;c.setup_();c.setup_(); // Idempotent, safe for repeated first loads.
 assert.equal(c.getMembers().length,0);
@@ -121,3 +122,21 @@ assert.ok(tables.Lives.r.some(r=>r[1]==='未来'));
 c.installDailyCleanup();c.installDailyCleanup();
 assert.equal(triggers.length,1);assert.deepEqual(triggerOptions,{hour:0,days:1,zone:'Asia/Tokyo'});
 console.log('PASS: short/full/native dates, invalid and leap dates, IDs, JST midnight and year rollover, expired rows only, trigger deduplication');
+
+const third=c.registerMember('Charlie');
+let editable=c.saveData(other,'live',{title:'編集対象',date:'2027-02-01'}).lives.find(l=>l.title==='編集対象');
+assert.throws(()=>c.saveData(third.id,'live',{...editable,title:'別人'}),/登録者/);
+tables.Lives.r.find(r=>r[0]===editable.id)[6]='copied-invalid-owner';
+editable=c.getData(other).lives.find(l=>l.id===editable.id);
+const edited=c.saveData(other,'live',{...editable,title:'編集できた'}).lives.find(l=>l.id===editable.id);
+assert.equal(edited.title,'編集できた');assert.equal(edited.owner,other);
+assert.throws(()=>c.saveData(other,'live',{...editable,title:'古い画面'}),/他の更新/);
+tables.Lives.appendRow(['','所有者空欄','2027-03-01']);
+const unowned=c.getData(other).lives.find(l=>l.title==='所有者空欄');
+assert.equal(c.saveData(other,'live',{...unowned,title:'空欄から編集'}).lives.find(l=>l.id===unowned.id).owner,other);
+io.opens=0;io.ranges=0;c.getData(other);
+assert.equal(io.opens,1);assert.equal(io.ranges,4);
+// A new request must see direct spreadsheet edits, not an earlier cached snapshot.
+tables.Lives.r.find(r=>r[0]===editable.id)[1]='スプシ変更';
+assert.equal(c.getData(other).lives.find(l=>l.id===editable.id).title,'スプシ変更');
+console.log('PASS: imported event edit/claim, valid owner guard, stale edit guard, one workbook open/four table reads, fresh reload');
