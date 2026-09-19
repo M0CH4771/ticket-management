@@ -12,7 +12,7 @@ const HEADERS_JA = {
   Tickets: ['チケットID','イベントID','メンバーID','整理番号','チケット状況','譲り先','メモ','更新番号'],
 };
 function doGet(e) {
-  ensureReady_();
+  // Connect immediately; initialization and maintenance happen in the data request.
   const channel=e?.parameter?.channel||'';
   if(channel && !/^[a-f0-9-]{36}$/.test(channel)) throw new Error('接続パラメータが無効です');
   const template=HtmlService.createTemplateFromFile('Bridge');
@@ -39,6 +39,7 @@ function setup_() {
   } finally { lock.releaseLock(); }
 }
 function ensureReady_() {
+  resetRequest_();
   const p=PropertiesService.getScriptProperties();
   if(!p.getProperty('SHEET_ID')) setup_();
   const lock=LockService.getScriptLock(); lock.waitLock(10000);
@@ -78,7 +79,7 @@ function normalizeDate_(value,year,timezone) {
   return date.getUTCFullYear()===y&&date.getUTCMonth()===m-1&&date.getUTCDate()===d?date.toISOString().slice(0,10):'';
 }
 function normalizeSheetDates_() {
-  const s=sheet_('Lives'),range=s.getDataRange(),raw=range.getValues();
+  const s=sheet_('Lives'),raw=readTable_('Lives').raw;
   const timezone=s.getParent().getSpreadsheetTimeZone(),year=Number(japanToday_().slice(0,4));
   for(let i=1;i<raw.length;i++) {
     const row=raw[i];
@@ -90,17 +91,17 @@ function normalizeSheetDates_() {
     if(/^\d{1,2}\/\d{1,2}$/.test(String(row[8]||'').normalize('NFKC').trim()) && eventDate && deadline>eventDate)
       deadline=normalizeDate_(row[8],deadlineYear-1,timezone);
     [[2,eventDate],[8,deadline]].forEach(([col,date])=>{
-      if(date && row[col]!==date) s.getRange(i+1,col+1,1,1).setNumberFormat('@').setValues([[date]]);
+      if(date && row[col]!==date) {s.getRange(i+1,col+1,1,1).setNumberFormat('@').setValues([[date]]);invalidate_('Lives');}
     });
   }
 }
 function deletePastEvents_() {
-  const s=sheet_('Lives'),rows=s.getDataRange().getDisplayValues(),today=japanToday_();
+  const s=sheet_('Lives'),rows=readTable_('Lives').display,today=japanToday_();
   // Delete bottom-up so blank rows, adjacent events and references cannot shift targets.
   // Only event rows are deleted. Member, attendance and ticket records are retained.
   for(let i=rows.length-1;i>=1;i--) {
     const row=rows[i],date=normalizeDate_(row[2],Number(today.slice(0,4)));
-    if(String(row[1]||'').trim() && date && date<today) s.deleteRow(i+1);
+    if(String(row[1]||'').trim() && date && date<today) {s.deleteRow(i+1);invalidate_('Lives');}
   }
 }
 // Run once in the Apps Script editor to authorize and enable unattended cleanup.
@@ -117,17 +118,17 @@ function dailyCleanup() { ensureReady_(); }
 // Foreign keys (event/member/owner references) are never guessed or overwritten.
 function fillSheetIds_() {
   ['Members','Lives'].forEach(name=>{
-    const s=sheet_(name), rows=s.getDataRange().getDisplayValues().slice(1);
+    const s=sheet_(name), rows=readTable_(name).display.slice(1);
     const seen=new Set();
     rows.forEach(r=>{if(r[0]) {if(seen.has(r[0])) throw new Error(name+'のIDが重複しています。コピーして追加した行のIDを空欄にしてください'); seen.add(r[0]);}});
     rows.forEach((r,i)=>{
       if(!r[1]?.trim() || (name==='Lives' && !normalizeDate_(r[2],Number(japanToday_().slice(0,4))))) return;
       if(!r[0]) {
         let id; do {id=Utilities.getUuid();} while(seen.has(id)); seen.add(id);
-        s.getRange(i+2,1,1,1).setValues([[id]]);
+        s.getRange(i+2,1,1,1).setValues([[id]]);invalidate_(name);
       }
       const col=name==='Members'?4:8;
-      if(!r[col-1]) s.getRange(i+2,col,1,1).setValues([[name==='Members'?'yes':'1']]);
+      if(!r[col-1]) {s.getRange(i+2,col,1,1).setValues([[name==='Members'?'yes':'1']]);invalidate_(name);}
     });
   });
 }
@@ -140,6 +141,7 @@ function registerMember(name) {
   ensureReady_();
   const lock=LockService.getScriptLock(); lock.waitLock(10000);
   try {
+    requestTables={}; // Re-read after acquiring the write lock.
     const displayName=text_(name,40,true).normalize('NFKC').replace(/\s+/g,' ');
     if(rows_('Members').some(m=>normalizedName_(m.name)===normalizedName_(displayName))) throw new Error('その名前は登録済みです。一覧から選ぶか、区別できる名前にしてください');
     const member={id:Utilities.getUuid(),name:displayName,tokenHash:'',active:'yes'};
@@ -147,8 +149,25 @@ function registerMember(name) {
     return {id:member.id,name:member.name};
   } finally { lock.releaseLock(); }
 }
-function sheet_(name) { return SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID')).getSheetByName(name); }
-function rows_(name) { return sheet_(name).getDataRange().getDisplayValues().slice(1).map(r => Object.fromEntries(TABLES[name].map((k,i)=>[k,r[i]??'']))); }
+// Request-local reuse only: a manual reload always reads the current spreadsheet.
+let requestBook=null,requestSheets={},requestTables={};
+function resetRequest_() { requestBook=null;requestSheets={};requestTables={}; }
+function sheet_(name) {
+  if(!requestBook) requestBook=SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID'));
+  return requestSheets[name]||(requestSheets[name]=requestBook.getSheetByName(name));
+}
+function invalidate_(name) { delete requestTables[name]; }
+function readTable_(name) {
+  if(!requestTables[name]) {
+    const range=sheet_(name).getDataRange();
+    requestTables[name]={display:range.getDisplayValues(),raw:name==='Lives'?range.getValues():null};
+  }
+  return requestTables[name];
+}
+function rows_(name) { return readTable_(name).display.slice(1).map(r => Object.fromEntries(TABLES[name].map((k,i)=>[k,r[i]??'']))); }
+function canEditLive_(live,me) {
+  return live.owner===me.id || !rows_('Members').some(m=>m.id===live.owner && m.active==='yes');
+}
 // A selected name is a convenience label, not authentication.
 // Anyone with the app URL can select any active member.
 function selectedMember_(memberId) {
@@ -199,6 +218,7 @@ function migrateLives_() {
     TABLES.Lives.slice(8).forEach((h,i)=>{if(headers[i+8] && headers[i+8]!==h && headers[i+8]!==HEADERS_JA.Lives[i+8]) throw new Error('追加先の列に既存データがあります');});
     s.getRange(1,9,s.getMaxRows(),TABLES.Lives.length-8).setNumberFormat('@');
     s.getRange(1,9,1,TABLES.Lives.length-8).setValues([HEADERS_JA.Lives.slice(8)]).setFontWeight('bold').setBackground('#dde8ff');
+    invalidate_('Lives');
     SpreadsheetApp.flush();
   } finally { lock.releaseLock(); }
 }
@@ -208,16 +228,18 @@ function write_(table,row,old) {
   const s=sheet_(table); const vals=TABLES[table].map(k=>safe_(row[k]??''));
   if (!old) s.appendRow(vals);
   else { const index=rows_(table).findIndex(x=>x.id===old.id); if(index<0) throw new Error('データが見つかりません'); s.getRange(index+2,1,1,vals.length).setValues([vals]); }
+  invalidate_(table);
 }
 function saveData(memberId,action,payload) {
   ensureReady_();
   const lock=LockService.getScriptLock(); if(!lock.tryLock(10000)) throw new Error('更新が混み合っています。少し待って再度保存してください');
   try {
+    requestTables={}; // Discard reads made before this write lock.
     const me=selectedMember_(memberId); const p=payload||{};
     if (action==='live') {
       const old=p.id?rows_('Lives').find(x=>x.id===p.id):null;
       if(p.id&&!old) throw new Error('ライブが見つかりません');
-      if(old && old.owner!==me.id) throw new Error('ライブの編集は登録者のみ可能です');
+      if(old && !canEditLive_(old,me)) throw new Error('ライブの編集は登録者のみ可能です');
       if(old && String(p.version)!==old.version) throw new Error('他の更新がありました。再読込してください');
       const date=normalizeDate_(p.date,Number(japanToday_().slice(0,4))); if(!date) throw new Error('日付を確認してください');
       if(date<japanToday_()) throw new Error('終了済みのイベントは登録できません');
@@ -237,12 +259,12 @@ function saveData(memberId,action,payload) {
         const named=nums.filter(Boolean).map(x=>x.toUpperCase());
         if(new Set(named).size!==named.length||named.some(n=>existing.includes(n))) throw new Error('このライブに同じ整理番号が登録されています。券種が異なる場合は「VIP-A12」などにしてください');
         const values=nums.map(number=>[Utilities.getUuid(),p.liveId,me.id,number,status,'','',1].map(safe_));
-        const s=sheet_('Tickets');s.getRange(s.getLastRow()+1,1,values.length,TABLES.Tickets.length).setValues(values);
+        const s=sheet_('Tickets');s.getRange(s.getLastRow()+1,1,values.length,TABLES.Tickets.length).setValues(values);invalidate_('Tickets');
       } else if(action==='ticket' || action==='deleteTicket') {
         const old=rows_('Tickets').find(t=>t.id===p.id&&t.liveId===p.liveId);
         if(!old||old.memberId!==me.id) throw new Error('選択中の名前のチケットのみ編集できます');
         if(String(p.version)!==old.version) throw new Error('他の更新がありました。再読込してください');
-        if(action==='deleteTicket') { sheet_('Tickets').deleteRow(rows_('Tickets').findIndex(t=>t.id===old.id)+2); }
+        if(action==='deleteTicket') { sheet_('Tickets').deleteRow(rows_('Tickets').findIndex(t=>t.id===old.id)+2);invalidate_('Tickets'); }
         else {
           const status=enum_(p.status,['未発券','自分用','余り','取引中','捌けた']);
           const number=text_(p.number,30,status!=='未発券');
