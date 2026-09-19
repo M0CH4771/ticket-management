@@ -7,6 +7,22 @@
 @media(prefers-reduced-motion:no-preference){button,a{transition:background .15s,border-color .15s}dialog[open]{animation:appear .16s ease-out}@keyframes appear{from{opacity:.5;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}}
 .event-tile .edit-event{margin-top:0;background:white;color:#3059df;border-color:#ccd6e7}
 .group-tags{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}.group-tag{border:1px solid #d8dff6;background:#eef1ff;color:#344b95;padding:5px 9px;border-radius:8px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}.group-options{display:flex;flex-wrap:wrap;gap:8px}.group-choice{display:flex;align-items:center;gap:8px;border:1px solid #ccd6e7;border-radius:10px;padding:10px;margin:0;min-height:48px;cursor:pointer;max-width:100%;overflow-wrap:anywhere}.group-choice:has(input:checked){background:#edf2ff;border-color:#3059df;color:#2446b3}.group-choice input{width:20px;min-width:20px;height:20px;min-height:20px;margin:0;accent-color:#3059df}fieldset{border:0;margin:20px 0 0;padding:0}legend{font-size:14px;font-weight:700;margin-bottom:10px}#member-message{color:#9b2530}#member-message:empty{display:none}
+
+@media(max-width:620px){
+  .event-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .card.event-tile{padding:12px;gap:9px;border-radius:14px}
+  .event-tile h2{font-size:15px;line-height:1.55}
+  .event-tile .date{font-size:13px;letter-spacing:0}
+  .event-tile .muted{font-size:12px;overflow-wrap:anywhere}
+  .event-tile .badge{font-size:11px;padding:4px 6px}
+  .event-tile dl{display:block;padding:10px;border-radius:9px}
+  .event-tile dt{font-size:12px}
+  .event-tile dt:not(:first-child){margin-top:9px}
+  .event-tile dd{font-size:15px;margin:2px 0 0}
+  .event-tile a,.event-tile button{min-height:44px;padding:9px 6px;font-size:13px;border-radius:9px;overflow-wrap:anywhere}
+  .event-tile .group-tags{gap:5px;margin:0}
+  .event-tile .group-tag{font-size:11px;padding:3px 6px;max-width:100%}
+}
 </style></head><body><header><div class="brand">Ticket Management<small>みんなのライブ・チケット管理</small></div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=a5773ee9"></script>
 <script src="./transport.js"></script>
@@ -57,7 +73,7 @@ function nextDay(day){return new Date(Date.parse(day+'T00:00:00Z')+86400000).toI
 function eventRank(l,today){if(l.date===today)return 0;if(l.lotteryDeadline===today)return 1;if(l.lotteryDeadline===nextDay(today))return 2;return 3}
 function sortedEvents(lives,today){return [...lives].sort((a,b)=>eventRank(a,today)-eventRank(b,today)||a.date.localeCompare(b.date)||a.title.localeCompare(b.title,'ja')||a.id.localeCompare(b.id))}
 function safeLink(url,label,sheet=false){const valid=sheet?/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url||''):/^https?:\/\/[a-zA-Z0-9.-]+(?::[0-9]+)?(?:[/?#][^\s<>]*)?$/.test(url||'');return valid?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`:`<p class="muted">${label}：未設定</p>`}
-function eventTile(l,tickets,today){const after=Boolean(l.lotteryDeadline)&&today>l.lotteryDeadline;const rank=eventRank(l,today);const labels=['本日開催','本日抽選締切','明日抽選締切'];const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'関連スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline||'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}`;return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''}" data-event="${esc(l.id)}">${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}<span class="date">${esc(l.date.replaceAll('-','.'))}</span><h2>${esc(l.title)}</h2>${groupTags(l)}<p class="muted">${esc(l.venue||'会場未登録')}</p>${extra}<button data-live="${esc(l.id)}">詳細・自分の番号を登録</button>${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}">イベント編集</button>`:''}</article>`}
+function eventTile(l,tickets,today){const after=Boolean(l.lotteryDeadline)&&today>l.lotteryDeadline;const rank=eventRank(l,today);const labels=['本日開催','本日抽選締切','明日抽選締切'];const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'関連スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline||'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}`;return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''}" data-event="${esc(l.id)}">${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}<span class="date">${esc(l.date.replaceAll('-','.'))}</span><h2>${esc(l.title)}</h2>${groupTags(l)}<p class="muted">${esc(l.venue||'会場未登録')}</p>${extra}<button data-live="${esc(l.id)}">詳細・番号登録</button>${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}">イベント編集</button>`:''}</article>`}
 function render(){if(!data)return;const today=japanDay();lastDay=today;const lives=sortedEvents(data.lives,today);if(selected&&!lives.some(x=>x.id===selected))selected='';
 $('account').innerHTML=`<span class="account-name">${esc(data.me.name)}</span><button id="logout">名前を変更</button>`;$('logout').onclick=()=>{if(busy)return;rememberMember('');notice('');chooseMemberScreen()};
 $('app').innerHTML=`<div class="top"><div><span class="date">YOUR LIVE BOARD</span><h1 style="margin-top:6px">${selected?'イベント詳細':'イベント一覧'}</h1></div><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>${selected?'<button class="back" id="back">← イベント一覧に戻る</button><section id="detail" class="detail-page"></section>':`<label for="search">イベントを探す</label><input id="search" class="search" placeholder="イベント名・会場・グループ" value="${esc(searchQuery)}"><div class="event-grid" id="lives"></div><p id="empty-events" class="empty" hidden></p>`}<p class="foot">最終読込 ${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}（日本時間）</p>`;
