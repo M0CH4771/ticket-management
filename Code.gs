@@ -4,6 +4,13 @@ const TABLES = {
   Attendance: ['id','liveId','memberId','status','version'],
   Tickets: ['id','liveId','memberId','number','status','recipient','memo','version'],
 };
+// Column positions and internal keys remain stable; only sheet labels are translated.
+const HEADERS_JA = {
+  Lives: ['イベントID（自動）','イベント名','開催日','会場','関連スプシURL','メモ','登録者ID','更新番号（自動）','抽選締切','必要投げ数（1人あたり）','チケット購入URL','出演グループ'],
+  Members: ['メンバーID（自動）','名前','旧認証情報（使用しません）','利用状態（yes / no）'],
+  Attendance: ['参戦予定ID','イベントID','メンバーID','参戦状況','更新番号'],
+  Tickets: ['チケットID','イベントID','メンバーID','整理番号','チケット状況','譲り先','メモ','更新番号'],
+};
 function doGet(e) {
   ensureReady_();
   const channel=e?.parameter?.channel||'';
@@ -23,20 +30,52 @@ function setup_() {
     Object.keys(TABLES).forEach(name=>{
       const s=ss.insertSheet(name);
       s.getRange(1,1,s.getMaxRows(),TABLES[name].length).setNumberFormat('@');
-      s.appendRow(TABLES[name]); s.setFrozenRows(1);
+      s.appendRow(HEADERS_JA[name]); s.setFrozenRows(1);
       s.getRange(1,1,1,TABLES[name].length).setFontWeight('bold').setBackground('#dde8ff');
     });
     p.setProperty('SHEET_ID',ss.getId());
-    p.setProperty('SCHEMA_VERSION','name-selection-v2');
+    p.setProperty('SCHEMA_VERSION','japanese-headers-v3');
     console.log('管理スプレッドシート: '+ss.getUrl());
   } finally { lock.releaseLock(); }
 }
 function ensureReady_() {
   const p=PropertiesService.getScriptProperties();
   if(!p.getProperty('SHEET_ID')) setup_();
-  if(p.getProperty('SCHEMA_VERSION')!=='name-selection-v2') {
-    migrateLives_(); p.setProperty('SCHEMA_VERSION','name-selection-v2');
-  }
+  const lock=LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    if(p.getProperty('SCHEMA_VERSION')!=='japanese-headers-v3') {
+      // Validate every table before changing any header. Preserve all existing rows.
+      Object.keys(TABLES).forEach(name=>{
+        const headers=sheet_(name).getDataRange().getDisplayValues()[0]||[];
+        TABLES[name].forEach((key,i)=>{
+          if(headers[i]!==key && headers[i]!==HEADERS_JA[name][i] && !(name==='Lives' && i>=8 && !headers[i]))
+            throw new Error(name+'の列の順番を確認してください');
+        });
+      });
+      Object.keys(TABLES).forEach(name=>sheet_(name).getRange(1,1,1,TABLES[name].length).setValues([HEADERS_JA[name]]).setFontWeight('bold').setBackground('#dde8ff'));
+      p.setProperty('SCHEMA_VERSION','japanese-headers-v3');
+    }
+    fillSheetIds_();
+    SpreadsheetApp.flush();
+  } finally { lock.releaseLock(); }
+}
+// Direct sheet entry: assign primary IDs only to complete event/name rows.
+// Foreign keys (event/member/owner references) are never guessed or overwritten.
+function fillSheetIds_() {
+  ['Members','Lives'].forEach(name=>{
+    const s=sheet_(name), rows=s.getDataRange().getDisplayValues().slice(1);
+    const seen=new Set();
+    rows.forEach(r=>{if(r[0]) {if(seen.has(r[0])) throw new Error(name+'のIDが重複しています。コピーして追加した行のIDを空欄にしてください'); seen.add(r[0]);}});
+    rows.forEach((r,i)=>{
+      if(!r[1]?.trim() || (name==='Lives' && !/^\d{4}-\d{2}-\d{2}$/.test(r[2]||''))) return;
+      if(!r[0]) {
+        let id; do {id=Utilities.getUuid();} while(seen.has(id)); seen.add(id);
+        s.getRange(i+2,1,1,1).setValues([[id]]);
+      }
+      const col=name==='Members'?4:8;
+      if(!r[col-1]) s.getRange(i+2,col,1,1).setValues([[name==='Members'?'yes':'1']]);
+    });
+  });
 }
 function getMembers() {
   ensureReady_();
@@ -75,11 +114,11 @@ function validateGroups_(value) {
   return [...new Map(names.map(n=>[n.toLowerCase(),n])).values()];
 }
 function snapshot_(me) {
-  const lives=rows_('Lives').map(l=>({...l,groups:readGroups_(l.groups)}));
+  const lives=rows_('Lives').filter(l=>l.id&&l.title&&l.date).map(l=>({...l,groups:readGroups_(l.groups)}));
   const groups=[...new Set(lives.flatMap(l=>l.groups))].sort((a,b)=>a.localeCompare(b,'ja'));
   return {me:{id:me.id,name:me.name},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives,groups,attendance:rows_('Attendance'),tickets:rows_('Tickets'),updatedAt:new Date().toISOString()};
 }
-function getData(memberId) { return snapshot_(selectedMember_(memberId)); }
+function getData(memberId) { ensureReady_(); return snapshot_(selectedMember_(memberId)); }
 function text_(value,max,required) { const s=String(value==null?'':value).trim(); if ((required&&!s)||s.length>max) throw new Error('入力内容・文字数を確認してください'); return s; }
 function deadline_(value) {
   const s=text_(value,10,false);
@@ -102,10 +141,10 @@ function migrateLives_() {
   const lock=LockService.getScriptLock(); lock.waitLock(10000);
   try {
     const s=sheet_('Lives'); const headers=s.getDataRange().getDisplayValues()[0];
-    TABLES.Lives.slice(0,8).forEach((h,i)=>{if(headers[i]!==h) throw new Error('Livesの列構成を確認してください');});
-    TABLES.Lives.slice(8).forEach((h,i)=>{if(headers[i+8] && headers[i+8]!==h) throw new Error('追加先の列に既存データがあります');});
+    TABLES.Lives.slice(0,8).forEach((h,i)=>{if(headers[i]!==h && headers[i]!==HEADERS_JA.Lives[i]) throw new Error('Livesの列構成を確認してください');});
+    TABLES.Lives.slice(8).forEach((h,i)=>{if(headers[i+8] && headers[i+8]!==h && headers[i+8]!==HEADERS_JA.Lives[i+8]) throw new Error('追加先の列に既存データがあります');});
     s.getRange(1,9,s.getMaxRows(),TABLES.Lives.length-8).setNumberFormat('@');
-    s.getRange(1,9,1,TABLES.Lives.length-8).setValues([TABLES.Lives.slice(8)]).setFontWeight('bold').setBackground('#dde8ff');
+    s.getRange(1,9,1,TABLES.Lives.length-8).setValues([HEADERS_JA.Lives.slice(8)]).setFontWeight('bold').setBackground('#dde8ff');
     SpreadsheetApp.flush();
   } finally { lock.releaseLock(); }
 }
@@ -117,6 +156,7 @@ function write_(table,row,old) {
   else { const index=rows_(table).findIndex(x=>x.id===old.id); if(index<0) throw new Error('データが見つかりません'); s.getRange(index+2,1,1,vals.length).setValues([vals]); }
 }
 function saveData(memberId,action,payload) {
+  ensureReady_();
   const lock=LockService.getScriptLock(); if(!lock.tryLock(10000)) throw new Error('更新が混み合っています。少し待って再度保存してください');
   try {
     const me=selectedMember_(memberId); const p=payload||{};
