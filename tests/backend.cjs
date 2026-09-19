@@ -1,8 +1,12 @@
 const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const tables={};let uid=0;const props={};
-class Sheet{constructor(){this.r=[]}appendRow(r){this.r.push(r.map(String))}getDataRange(){return{getDisplayValues:()=>this.r.map(r=>r.map(String))}}getLastRow(){return this.r.length}getMaxRows(){return 1000}setFrozenRows(){}getRange(row,col,n,m){const api={setValues:v=>{v.forEach((r,i)=>{this.r[row-1+i]??=[];r.forEach((x,j)=>this.r[row-1+i][col-1+j]=String(x))});return api},setFontWeight:()=>api,setBackground:()=>api,setNumberFormat:()=>api};return api}deleteRow(n){this.r.splice(n-1,1)}}
-const ss={insertSheet:n=>tables[n]=new Sheet(),getSheetByName:n=>tables[n],getUrl:()=>'',getId:()=> 'test'};
-const context=vm.createContext({console:{log(){}},SpreadsheetApp:{create:()=>ss,openById:()=>ss,flush(){}},PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k],setProperty:(k,v)=>props[k]=v})},Utilities:{getUuid:()=>String(++uid).padStart(36,'0'),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s)=>Array.from(crypto.createHash('sha256').update(s).digest())},LockService:{getScriptLock:()=>({tryLock:()=>true,waitLock(){},releaseLock(){}})}});
+let now='2026-09-19T03:00:00Z';
+class Clock extends Date { constructor(...args){super(...(args.length?args:[now]));} }
+const triggers=[];const triggerOptions={};
+const triggerBuilder={timeBased(){return this},atHour(v){triggerOptions.hour=v;return this},everyDays(v){triggerOptions.days=v;return this},inTimezone(v){triggerOptions.zone=v;return this},create(){triggers.push({getHandlerFunction:()=> 'dailyCleanup'});return triggers.at(-1)}};
+class Sheet{constructor(){this.r=[]}appendRow(r){this.r.push(r.map(String))}getDataRange(){return{getValues:()=>this.r.map(r=>r.slice()),getDisplayValues:()=>this.r.map(r=>r.map(String))}}getParent(){return ss}getLastRow(){return this.r.length}getMaxRows(){return 1000}setFrozenRows(){}getRange(row,col,n,m){const api={setValues:v=>{v.forEach((r,i)=>{this.r[row-1+i]??=[];r.forEach((x,j)=>this.r[row-1+i][col-1+j]=String(x))});return api},setFontWeight:()=>api,setBackground:()=>api,setNumberFormat:()=>api};return api}deleteRow(n){this.r.splice(n-1,1)}}
+const ss={getSpreadsheetTimeZone:()=> 'Asia/Tokyo',insertSheet:n=>tables[n]=new Sheet(),getSheetByName:n=>tables[n],getUrl:()=>'',getId:()=> 'test'};
+const context=vm.createContext({Date:Clock,ScriptApp:{getProjectTriggers:()=>triggers,newTrigger:()=>triggerBuilder},console:{log(){}},SpreadsheetApp:{create:()=>ss,openById:()=>ss,flush(){}},PropertiesService:{getScriptProperties:()=>({getProperty:k=>props[k],setProperty:(k,v)=>props[k]=v})},Utilities:{formatDate:(d,tz)=>new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit'}).format(d),getUuid:()=>String(++uid).padStart(36,'0'),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,s)=>Array.from(crypto.createHash('sha256').update(s).digest())},LockService:{getScriptLock:()=>({tryLock:()=>true,waitLock(){},releaseLock(){}})}});
 vm.runInContext(fs.readFileSync(__dirname+'/../Code.gs','utf8'),context);
 const c=context;c.setup_();c.setup_(); // Idempotent, safe for repeated first loads.
 assert.equal(c.getMembers().length,0);
@@ -83,3 +87,37 @@ c.saveData(other,'live',{...imported,title:'まとめ登録を編集'});
 tables.Lives.appendRow([existingId,'重複','2026-11-02']);
 assert.throws(()=>c.ensureReady_(),/IDが重複/);
 console.log('PASS: Japanese migration preserves data, bulk IDs persist, blank rows skipped, duplicates rejected, imported event editable');
+
+// Calendar boundaries, spreadsheet-native dates and scheduled deletion.
+tables.Lives.r.pop(); // remove intentional duplicate from prior test
+assert.equal(c.normalizeDate_('9/20',2026),'2026-09-20');
+assert.equal(c.normalizeDate_('２０２７/１/２',2026),'2027-01-02');
+assert.equal(c.normalizeDate_('2028/2/29',2026),'2028-02-29');
+for(const v of ['2/30','2026-02-29','13/1','9/31','random','']) assert.equal(c.normalizeDate_(v,2026),'');
+const recordsBefore={members:JSON.stringify(tables.Members.r),tickets:JSON.stringify(tables.Tickets.r),attendance:JSON.stringify(tables.Attendance.r)};
+for(const [title,date] of [['昨日','9/18'],['一昨日','2026/9/17'],['今日','9/19'],['明日','9/20'],['不正','2/30'],['未来','2027/1/10']]) tables.Lives.appendRow(['',title,date,'','','',other,'','8/24']);
+const nativeRow=tables.Lives.r.length;
+tables.Lives.appendRow(['','日付セル','']);tables.Lives.r[nativeRow][2]=new Date('2026-09-20T15:00:00Z');
+c.ensureReady_();
+assert.equal(tables.Lives.r.find(r=>r[1]==='日付セル')[2],'2026-09-21');
+assert.ok(!tables.Lives.r.some(r=>['昨日','一昨日'].includes(r[1])));
+assert.equal(tables.Lives.r.find(r=>r[1]==='今日')[2],'2026-09-19');
+assert.ok(tables.Lives.r.find(r=>r[1]==='明日')[0]);
+assert.equal(tables.Lives.r.find(r=>r[1]==='明日')[8],'2026-08-24');
+assert.ok(tables.Lives.r.some(r=>r[1]==='不正')); // invalid dates never authorize deletion
+assert.ok(!c.getData(other).lives.some(l=>l.title==='不正'));
+now='2026-09-19T14:59:59Z';c.dailyCleanup();assert.ok(tables.Lives.r.some(r=>r[1]==='今日'));
+now='2026-09-19T15:00:00Z';c.dailyCleanup();assert.ok(!tables.Lives.r.some(r=>r[1]==='今日'));assert.ok(tables.Lives.r.some(r=>r[1]==='明日'));
+assert.equal(JSON.stringify(tables.Members.r),recordsBefore.members);
+assert.equal(JSON.stringify(tables.Tickets.r),recordsBefore.tickets);
+assert.equal(JSON.stringify(tables.Attendance.r),recordsBefore.attendance);
+const tomorrowId=tables.Lives.r.find(r=>r[1]==='明日')[0];
+c.dailyCleanup();assert.equal(tables.Lives.r.find(r=>r[1]==='明日')[0],tomorrowId);
+assert.throws(()=>c.saveData(other,'live',{title:'終了済み',date:'9/19'}),/終了済み/);
+now='2026-12-31T14:00:00Z';tables.Lives.appendRow(['','大晦日','12/31']);c.dailyCleanup();
+assert.equal(tables.Lives.r.find(r=>r[1]==='大晦日')[2],'2026-12-31');
+now='2026-12-31T15:00:00Z';c.dailyCleanup();assert.ok(!tables.Lives.r.some(r=>r[1]==='大晦日'));
+assert.ok(tables.Lives.r.some(r=>r[1]==='未来'));
+c.installDailyCleanup();c.installDailyCleanup();
+assert.equal(triggers.length,1);assert.deepEqual(triggerOptions,{hour:0,days:1,zone:'Asia/Tokyo'});
+console.log('PASS: short/full/native dates, invalid and leap dates, IDs, JST midnight and year rollover, expired rows only, trigger deduplication');
