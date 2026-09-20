@@ -59,6 +59,13 @@
 .event-list .tile-attendance li{grid-template-columns:minmax(0,1fr) 4em minmax(4.5em,auto);align-items:baseline}
 .event-list .tile-attendance .attendance-name{grid-column:auto}
 .event-list .attendance-surplus{text-align:right}
+
+.ticket-entry{padding:12px;border:1px solid #dce3ed;border-radius:12px;margin:12px 0;background:#f8faff}
+.entry-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.entry-label{font-size:14px}.entry-heading button{min-height:44px;padding:6px 12px;font-size:13px}
+.entry-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.entry-fields label{margin:8px 0 6px}.entry-fields select{padding-left:8px;padding-right:4px}
+.batch-add{width:100%;margin-bottom:12px}
 </style></head><body><header><div class="brand">Ticket Management<small>みんなのライブ・チケット管理</small></div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=a5773ee9"></script>
 <script src="./transport.js"></script>
@@ -139,7 +146,47 @@ function modal(title,body,onSave){modalDirty=false;const live=/番号|チケッ�
 
 function liveForm(l={}){if(busy||cachedView)return;const available=[...new Set([...(data.groups||[]),...(l.groups||[])])].sort((a,b)=>a.localeCompare(b,'ja'));modal(l.id?'イベントを編集':'イベントを登録',field('日付','date',l.date,'date',true)+field('イベント名','title',l.title,'text',true)+field('会場','venue',l.venue)+field('チケット購入ページURL','purchaseUrl',l.purchaseUrl,'url')+field('抽選締切','lotteryDeadline',l.lotteryDeadline,'date')+`<label for="f-requiredThrows">投げ数</label><input id="f-requiredThrows" name="requiredThrows" type="number" min="0" step="1" value="${esc(l.requiredThrows??'')}" placeholder="未設定"><fieldset><legend>出演グループ（複数選択）</legend><div class="group-options">${available.map(g=>`<label class="group-choice"><input type="checkbox" name="group-option" value="${esc(g)}" ${(l.groups||[]).includes(g)?'checked':''}>${esc(g)}</label>`).join('')||'<span class="muted">グループは下の欄から追加できます。</span>'}</div><label for="new-groups">新しいグループを追加</label><input id="new-groups" name="newGroups" placeholder="例：グループA、グループB"><p class="muted form-hint">カンマ・読点で区切って入力。イベントの保存時に追加されます。</p></fieldset><details style="margin-top:20px"><summary>関連スプシ・メモ（任意）</summary>`+field('スプシURL','sheetUrl',l.sheetUrl,'url')+`<label for="memo">メモ</label><textarea id="memo" name="memo" maxlength="500">${esc(l.memo||'')}</textarea></details>`,p=>{const groups=[...document.querySelectorAll('#form input[name="group-option"]:checked')].map(el=>el.value).concat((p.newGroups||'').split(/[,、\n]+/).map(g=>g.trim()).filter(Boolean));save('live',{...p,groups,id:l.id,version:l.version})})}
 function parseNumbers(value){return value.normalize('NFKC').trim().split(/[\s,、]+/).filter(Boolean)}
-function addForm(){modal('自分の番号を登録',`<label for="status">登録時の状態</label><select id="status" name="status">${opts(['余り','自分用','未発券'],'余り')}</select><div id="number-fields"><label for="numbers">整理番号</label><textarea id="numbers" name="numbers" autocapitalize="characters" spellcheck="false" placeholder="A12\nA35\nA86" aria-describedby="number-hint number-preview"></textarea><p id="number-hint" class="muted form-hint">改行・カンマ・空白で区切って、50枚までまとめて入力できます。</p></div><div id="count-fields" hidden><label for="count">未発券の枚数</label><input id="count" name="count" type="number" inputmode="numeric" value="3" min="1" max="50" step="1" disabled></div><p id="number-preview" class="preview-count" aria-live="polite">0枚を登録</p><p class="muted form-hint">券種が異なる場合は「VIP-A12」などにしてください。</p>`,p=>{const numbers=p.status==='未発券'?Array(Number(p.count)).fill(''):parseNumbers(p.numbers);if(!numbers.length||numbers.length>50){notice('1〜50枚の整理番号を入力してください');return}const named=numbers.filter(Boolean).map(n=>n.toUpperCase());if(new Set(named).size!==named.length){notice('同じ整理番号が含まれています。入力を確認してください');return}save('addTickets',{liveId:selected,numbers,status:p.status})});const update=()=>{const pending=$('status').value==='未発券';$('number-fields').hidden=pending;$('count-fields').hidden=!pending;$('numbers').disabled=pending;$('count').disabled=!pending;$('count').required=pending;const count=pending?Number($('count').value):parseNumbers($('numbers').value).length;$('number-preview').textContent=count+'枚を登録';$('submit-save').textContent=count>0&&count<=50?count+'枚を登録':'登録する'};$('status').addEventListener('change',update);$('numbers').addEventListener('input',update);$('count').addEventListener('input',update);update()}
+function addForm(){
+  if(busy||cachedView)return;
+  modal('自分の番号を登録',`<p class="muted">1枚ずつ番号と捌き状況を選び、まとめて登録できます。</p><div id="ticket-entry-rows"></div><button type="button" id="append-ticket" class="batch-add">＋ 1枚追加</button><details><summary>番号をまとめて貼り付ける</summary><label for="batch-numbers">整理番号</label><textarea id="batch-numbers" placeholder="A12\nA35\nA86"></textarea><p class="muted form-hint">改行・カンマ・空白で区切って入力。追加後に1枚ずつ状況を選べます。</p><button type="button" id="import-numbers">入力欄に追加</button></details><p id="number-preview" class="preview-count" aria-live="polite"></p><p class="muted form-hint">最大50枚。未発券は番号なしで登録できます。</p>`,()=>{
+    const entries=[...$('ticket-entry-rows').children].map(row=>({number:row.querySelector('input').value.normalize('NFKC').trim(),status:row.querySelector('select').value})).map(e=>({...e,number:e.status==='未発券'?'':e.number}));
+    const named=entries.map(e=>e.number.toUpperCase()).filter(Boolean);
+    if(new Set(named).size!==named.length){notice('同じ整理番号が含まれています。入力を確認してください');return}
+    save('addTickets',{liveId:selected,entries});
+  });
+  let serial=0;
+  const update=()=>{
+    const rows=[...$('ticket-entry-rows').children];
+    rows.forEach((row,i)=>{
+      const input=row.querySelector('input'),pending=row.querySelector('select').value==='未発券';
+      input.disabled=pending;input.required=!pending;
+      row.querySelector('.entry-label').textContent=(i+1)+'枚目';
+      row.querySelector('button').disabled=rows.length===1;
+    });
+    $('append-ticket').disabled=rows.length>=50;
+    $('number-preview').textContent=rows.length+'枚をまとめて登録';
+    $('submit-save').textContent=rows.length+'枚を登録';
+  };
+  const append=(number='')=>{
+    const id=++serial;
+    $('ticket-entry-rows').insertAdjacentHTML('beforeend',`<div class="ticket-entry"><div class="entry-heading"><strong class="entry-label"></strong><button type="button" class="remove-entry" aria-label="この入力行を削除">削除</button></div><div class="entry-fields"><div><label for="entry-number-${id}">整理番号</label><input id="entry-number-${id}" value="${esc(number)}" maxlength="30" placeholder="例：A12" autocapitalize="characters" spellcheck="false" required></div><div><label for="entry-status-${id}">捌き状況</label><select id="entry-status-${id}">${opts(['余り','自分用','取引中','捌けた','未発券'],'余り')}</select></div></div></div>`);
+    update();
+  };
+  $('ticket-entry-rows').onchange=update;
+  $('ticket-entry-rows').onclick=e=>{if(e.target.closest('.remove-entry')){e.target.closest('.ticket-entry').remove();modalDirty=true;update()}};
+  $('append-ticket').onclick=()=>{if($('ticket-entry-rows').children.length<50){append();modalDirty=true;$('ticket-entry-rows').lastElementChild.querySelector('input').focus()}};
+  $('import-numbers').onclick=()=>{
+    const numbers=parseNumbers($('batch-numbers').value);
+    if(!numbers.length){notice('追加する番号を入力してください');return}
+    const rows=[...$('ticket-entry-rows').children];
+    const empty=rows.length===1&&!rows[0].querySelector('input').value&&rows[0].querySelector('select').value==='余り';
+    if(rows.length-(empty?1:0)+numbers.length>50){notice('1回に登録できるのは50枚までです');return}
+    if(numbers.some(n=>n.length>30)){notice('整理番号は30文字以内にしてください');return}
+    if(empty)rows[0].remove();
+    numbers.forEach(append);$('batch-numbers').value='';modalDirty=true;update();
+  };
+  append();
+}
 
 function ticketForm(t){modal('チケットを編集',field('整理番号','number',t.number)+`<label for="status">状態</label><select id="status" name="status">${opts(statuses,t.status)}</select>`+field('譲り先（任意）','recipient',t.recipient)+`<label for="memo">メモ</label><textarea id="memo" name="memo" maxlength="500">${esc(t.memo)}</textarea><button class="danger" type="button" id="delete" style="margin-top:18px">このチケットを削除</button>`,p=>save('ticket',{...p,id:t.id,liveId:t.liveId,version:t.version}));$('delete').onclick=()=>{if(confirm('このチケットを削除しますか？'))save('deleteTicket',{id:t.id,liveId:t.liveId,version:t.version})}}
 function showSetup(){ $('account').textContent='';$('app').innerHTML='<div class="card login"><span class="date">Ticket Management</span><h1 style="margin-top:12px">初期設定を準備中です</h1><p>イベント・チケットの保存先を接続すると利用できます。</p><p class="muted">幹事の方は設定手順に沿ってGASを公開し、そのURLを設定してください。メンバーの方の設定は不要です。</p><a href="https://github.com/M0CH4771/ticket-management#最初の設定" target="_blank" rel="noopener">設定手順を見る ↗</a></div>'}
