@@ -148,8 +148,8 @@ function liveForm(l={}){if(busy||cachedView)return;const available=[...new Set([
 function parseNumbers(value){return value.normalize('NFKC').trim().split(/[\s,、]+/).filter(Boolean)}
 function addForm(){
   if(busy||cachedView)return;
-  modal('自分の番号を登録',`<p class="muted">1枚ずつ番号と捌き状況を選び、まとめて登録できます。</p><div id="ticket-entry-rows"></div><button type="button" id="append-ticket" class="batch-add">＋ 1枚追加</button><details><summary>番号をまとめて貼り付ける</summary><label for="batch-numbers">整理番号</label><textarea id="batch-numbers" placeholder="A12\nA35\nA86"></textarea><p class="muted form-hint">改行・カンマ・空白で区切って入力。追加後に1枚ずつ状況を選べます。</p><button type="button" id="import-numbers">入力欄に追加</button></details><p id="number-preview" class="preview-count" aria-live="polite"></p><p class="muted form-hint">最大50枚。未発券は番号なしで登録できます。</p>`,()=>{
-    const entries=[...$('ticket-entry-rows').children].map(row=>({number:row.querySelector('input').value.normalize('NFKC').trim(),status:row.querySelector('select').value})).map(e=>({...e,number:e.status==='未発券'?'':e.number}));
+  modal('自分の番号を登録',`<p class="muted">1枚ずつ番号と捌き状況を選び、まとめて登録できます。</p><div id="ticket-entry-rows"></div><button type="button" id="append-ticket" class="batch-add">＋ 1枚追加</button><details><summary>番号をまとめて貼り付ける</summary><label for="batch-numbers">整理番号</label><textarea id="batch-numbers" placeholder="A12\nA35\nA86"></textarea><p class="muted form-hint">改行・カンマ・空白で区切って入力。追加後に1枚ずつ状況を選べます。</p><button type="button" id="import-numbers">入力欄に追加</button></details><p id="number-preview" class="preview-count" aria-live="polite"></p><p class="muted form-hint">最大50枚。使わない入力欄は削除できます。</p>`,()=>{
+    const entries=[...$('ticket-entry-rows').children].map(row=>({number:row.querySelector('input').value.normalize('NFKC').trim(),status:row.querySelector('select').value}));
     const named=entries.map(e=>e.number.toUpperCase()).filter(Boolean);
     if(new Set(named).size!==named.length){notice('同じ整理番号が含まれています。入力を確認してください');return}
     save('addTickets',{liveId:selected,entries});
@@ -158,8 +158,8 @@ function addForm(){
   const update=()=>{
     const rows=[...$('ticket-entry-rows').children];
     rows.forEach((row,i)=>{
-      const input=row.querySelector('input'),pending=row.querySelector('select').value==='未発券';
-      input.disabled=pending;input.required=!pending;
+      const input=row.querySelector('input');
+      input.required=true;
       row.querySelector('.entry-label').textContent=(i+1)+'枚目';
       row.querySelector('button').disabled=rows.length===1;
     });
@@ -169,7 +169,7 @@ function addForm(){
   };
   const append=(number='')=>{
     const id=++serial;
-    $('ticket-entry-rows').insertAdjacentHTML('beforeend',`<div class="ticket-entry"><div class="entry-heading"><strong class="entry-label"></strong><button type="button" class="remove-entry" aria-label="この入力行を削除">削除</button></div><div class="entry-fields"><div><label for="entry-number-${id}">整理番号</label><input id="entry-number-${id}" value="${esc(number)}" maxlength="30" placeholder="例：A12" autocapitalize="characters" spellcheck="false" required></div><div><label for="entry-status-${id}">捌き状況</label><select id="entry-status-${id}">${opts(['余り','自分用','取引中','捌けた','未発券'],'余り')}</select></div></div></div>`);
+    $('ticket-entry-rows').insertAdjacentHTML('beforeend',`<div class="ticket-entry"><div class="entry-heading"><strong class="entry-label"></strong><button type="button" class="remove-entry" aria-label="この入力行を削除">削除</button></div><div class="entry-fields"><div><label for="entry-number-${id}">整理番号</label><input id="entry-number-${id}" value="${esc(number)}" maxlength="30" placeholder="例：A12" autocapitalize="characters" spellcheck="false" required></div><div><label for="entry-status-${id}">捌き状況</label><select id="entry-status-${id}">${opts(['余り','自分用','取引中','捌けた'],'余り')}</select></div></div></div>`);
     update();
   };
   $('ticket-entry-rows').onchange=update;
@@ -179,13 +179,13 @@ function addForm(){
     const numbers=parseNumbers($('batch-numbers').value);
     if(!numbers.length){notice('追加する番号を入力してください');return}
     const rows=[...$('ticket-entry-rows').children];
-    const empty=rows.length===1&&!rows[0].querySelector('input').value&&rows[0].querySelector('select').value==='余り';
-    if(rows.length-(empty?1:0)+numbers.length>50){notice('1回に登録できるのは50枚までです');return}
+    const empty=rows.filter(row=>!row.querySelector('input').value.trim()&&row.querySelector('select').value==='余り');
+    if(rows.length-empty.length+numbers.length>50){notice('1回に登録できるのは50枚までです');return}
     if(numbers.some(n=>n.length>30)){notice('整理番号は30文字以内にしてください');return}
-    if(empty)rows[0].remove();
+    empty.forEach(row=>row.remove());
     numbers.forEach(append);$('batch-numbers').value='';modalDirty=true;update();
   };
-  append();
+  for(let i=0;i<3;i++)append();
 }
 
 function ticketForm(t){modal('チケットを編集',field('整理番号','number',t.number)+`<label for="status">状態</label><select id="status" name="status">${opts(statuses,t.status)}</select>`+field('譲り先（任意）','recipient',t.recipient)+`<label for="memo">メモ</label><textarea id="memo" name="memo" maxlength="500">${esc(t.memo)}</textarea><button class="danger" type="button" id="delete" style="margin-top:18px">このチケットを削除</button>`,p=>save('ticket',{...p,id:t.id,liveId:t.liveId,version:t.version}));$('delete').onclick=()=>{if(confirm('このチケットを削除しますか？'))save('deleteTicket',{id:t.id,liveId:t.liveId,version:t.version})}}
