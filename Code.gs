@@ -263,13 +263,20 @@ function saveData(memberId,action,payload,options) {
         if(old && String(p.version)!==old.version) throw new Error('他の更新がありました。再読込してください');
         write_('Attendance',{id:old?old.id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,status:enum_(p.status,['参戦','未定','不参加']),version:old?Number(old.version)+1:1},old);
       } else if(action==='addTickets') {
-        if(!Array.isArray(p.numbers)||p.numbers.length<1||p.numbers.length>50) throw new Error('1回に1〜50枚まで登録できます');
-        const status=enum_(p.status,['未発券','自分用','余り']);
-        const nums=p.numbers.map(n=>text_(n,30,status!=='未発券'));
+        // Accept the old uniform-status payload as well as per-ticket entries.
+        const input=p.entries!==undefined?p.entries:(Array.isArray(p.numbers)?p.numbers.map(number=>({number,status:p.status})):null);
+        if(!Array.isArray(input)||input.length<1||input.length>50) throw new Error('1回に1〜50枚まで登録できます');
+        const entries=input.map(entry=>{
+          if(!entry||typeof entry!=='object') throw new Error('チケットの入力内容を確認してください');
+          const status=enum_(entry.status,['未発券','自分用','余り','取引中','捌けた']);
+          const number=status==='未発券'?'':text_(String(entry.number??'').normalize('NFKC'),30,true);
+          return {number,status};
+        });
+        const nums=entries.map(entry=>entry.number);
         const existing=rows_('Tickets').filter(t=>t.liveId===p.liveId).map(t=>t.number.toUpperCase());
         const named=nums.filter(Boolean).map(x=>x.toUpperCase());
         if(new Set(named).size!==named.length||named.some(n=>existing.includes(n))) throw new Error('このライブに同じ整理番号が登録されています。券種が異なる場合は「VIP-A12」などにしてください');
-        const added=nums.map(number=>({id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,number,status,recipient:'',memo:'',version:1}));
+        const added=entries.map(({number,status})=>({id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,number,status,recipient:'',memo:'',version:1}));
         const values=added.map(row=>TABLES.Tickets.map(k=>safe_(row[k])));
         const s=sheet_('Tickets');s.getRange(s.getLastRow()+1,1,values.length,TABLES.Tickets.length).setValues(values);invalidate_('Tickets');added.forEach(row=>recordChange_('Tickets',row));
       } else if(action==='ticket' || action==='deleteTicket') {
