@@ -1,0 +1,44 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+const script=fs.readFileSync(__dirname+'/../docs/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
+const values=new Map(),calls=[],notices=[];let quota=false,lockAllowed=true;
+const modal={open:true,close(){this.open=false}};
+const c=vm.createContext({crypto,sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},localStorage:{getItem:k=>values.get(k)||null,setItem(k,v){if(quota)throw Error('quota');values.set(k,v)},removeItem:k=>values.delete(k)},navigator:{locks:{request:async(k,o,fn)=>fn(lockAllowed?{}:null)}},window:{LIVE_POCKET_CONFIG:{gasUrl:'endpoint'},scrollTo(){},scrollY:0},document:{getElementById:id=>id==='modal'?modal:null,querySelectorAll:()=>[]}});
+vm.runInContext(script.slice(0,script.indexOf('function showSetup()')),c);
+c.render=()=>{};c.notice=s=>notices.push(s);c.cacheSnapshot=()=>{};
+c.rpc=(...args)=>new Promise((resolve,reject)=>calls.push({args,resolve,reject}));
+const fixture={me:{id:'me'},members:[{id:'me',name:'Me'}],lives:[{id:'event',title:'Before',date:'2099-01-01',groups:[],version:'1',owner:'me'}],tickets:[],attendance:[],groups:[],updatedAt:'old',capabilities:{durableSave:true}};
+c.fixture=fixture;vm.runInContext("data=fixture;confirmedData=fixture;memberId='me'",c);
+const tick=async()=>{for(let i=0;i<8;i++)await Promise.resolve()};
+const read=code=>vm.runInContext(code,c);
+(async()=>{
+  await c.save('live',{...fixture.lives[0],title:'Immediately'});await tick();
+  assert.equal(read('data.lives[0].title'),'Immediately');assert.equal(modal.open,false);
+  assert.equal(read('busy'),false);assert.equal(read('sending'),true);assert.equal(calls.length,1);
+  assert.ok(values.size);assert.ok(!notices.includes('保存しました'));
+  await c.save('live',{...fixture.lives[0],title:'Blocked'});assert.equal(read('outbox.length'),1);
+  await c.save('attendance',{liveId:'event',status:'参戦'});await tick();assert.equal(read('outbox.length'),2);assert.equal(calls.length,1);
+  const first=calls.shift();assert.ok(first.args[4].requestId);
+  first.resolve({kind:'patch-v1',changes:{Lives:{upsert:[{...fixture.lives[0],title:'Immediately',version:'2'}],remove:[]}},savedAt:'now'});await tick();
+  assert.equal(read('outbox.length'),1);assert.equal(read('data.attendance[0].status'),'参戦');assert.equal(calls.length,1);
+  const second=calls.shift();second.reject(Error('通信切断'));await tick();
+  assert.equal(read('outbox[0].state'),'error');assert.equal(read('data.attendance.length'),0);
+  assert.equal(read('outbox[0].payload.status'),'参戦');assert.ok(values.size);
+  const requestId=second.args[4].requestId;
+  read("outbox[0].state='queued'");const retry=c.processOutbox();await tick();
+  const retryCall=calls.shift();assert.equal(retryCall.args[4].requestId,requestId);
+  retryCall.resolve({kind:'patch-v1',changes:{Attendance:{upsert:[{id:'att',liveId:'event',memberId:'me',status:'参戦',version:'1'}],remove:[]}},savedAt:'now'});await retry;
+  assert.equal(read('outbox.length'),0);assert.equal(read('data.attendance[0].id'),'att');assert.equal(values.size,0);
+  // A send that cannot first be persisted must not leave the form or contact GAS.
+  quota=true;modal.open=true;
+  await c.save('ticket',{id:'ticket',liveId:'event',number:'A1',status:'余り',version:'1'});await tick();
+  assert.equal(modal.open,true);assert.equal(read('outbox.length'),0);assert.equal(calls.length,0);quota=false;
+  lockAllowed=false;await c.save('live',{...fixture.lives[0],title:'Other tab'});assert.equal(calls.length,0);lockAllowed=true;
+  // Durable restoration retains request IDs and member-scoped payloads.
+  await c.save('addTickets',{liveId:'event',entries:[{number:'A5',status:'余り'}]});await tick();
+  const queuedId=read('outbox[0].id');
+  assert.ok(read("data.tickets[0].id.startsWith('pending-')"));
+  assert.equal(c.restoreOutbox(),true);assert.equal(read('outbox[0].id'),queuedId);assert.equal(read('outbox[0].state'),'queued');
+  calls.shift().resolve({kind:'patch-v1',changes:{Tickets:{upsert:[{id:'real',liveId:'event',memberId:'me',number:'A5',status:'余り',version:'1',recipient:'',memo:''}],remove:[]}}});await tick();
+  assert.equal(read('data.tickets.length'),1);assert.equal(read('data.tickets[0].id'),'real');
+  console.log('PASS: immediate preview, persistent sequential queue, no false success, duplicate-target guard, retry ID reuse, rollback with retained input, quota and cross-tab guard, restoration and canonical IDs');
+})().catch(error=>{console.error(error);process.exitCode=1});
