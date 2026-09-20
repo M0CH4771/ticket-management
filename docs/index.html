@@ -66,6 +66,9 @@
 .entry-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
 .entry-fields label{margin:8px 0 6px}.entry-fields select{padding-left:8px;padding-right:4px}
 .batch-add{width:100%;margin-bottom:12px}
+
+.sync-panel{border:1px solid #dfb960;background:#fff9e9;border-radius:12px;padding:14px;margin-bottom:18px;font-size:14px;overflow-wrap:anywhere}
+.sync-panel p{font-size:12px;margin:8px 0 0}.sync-item{padding:10px 0;border-bottom:1px solid #ecd9aa;display:grid;gap:6px}.sync-item b{color:#805800}.sync-item button{font-size:13px;min-height:44px}
 </style></head><body><header><div class="brand">Ticket Management<small>みんなのライブ・チケット管理</small></div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=a5773ee9"></script>
 <script src="./transport.js"></script>
@@ -86,13 +89,13 @@ function notice(s){clearTimeout(noticeTimer);$('notice').textContent=s;const inl
 function rpc(fn,...args){return window.LivePocketTransport.call(fn,...args)}
 function showRefreshState(){const button=$('reload');if(button){button.disabled=loading;button.textContent=loading?'更新中…':'再読込'}}
 async function refresh(){
-  if(busy||loading||$('modal').open)return;
+  if(busy||sending||loading||$('modal').open)return;
   const version=++refreshVersion,requestedMember=memberId;
   loading=true;showRefreshState();if(!data)notice('読み込み中…');
   try{
     const result=await rpc('getData',requestedMember);
     if(version!==refreshVersion||memberId!==requestedMember)return;
-    data=result;cachedView=false;cacheSnapshot();notice('');
+    confirmedData=result;rebuildOptimistic();cachedView=false;cacheSnapshot();notice('');
     // A background reply must never rebuild a form the user has started editing.
     if(!$('modal').open)render();
   }catch(e){
@@ -114,7 +117,85 @@ function applySaveResult(current,result){
   if(result.changes.Lives)next.groups=[...new Set(next.lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));
   return next;
 }
-async function save(action,p){if(busy)return;busy=true;++refreshVersion;loading=false;showRefreshState();const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(el=>!el.disabled);controls.forEach(el=>el.disabled=true);notice('保存中…');try{data=applySaveResult(data,await rpc('saveData',memberId,action,p,{response:'patch-v1'}));cacheSnapshot();modalDirty=false;$('modal').close();render();notice('保存しました')}catch(e){if(action==='attendance')detail();notice(e.message)}finally{busy=false;controls.forEach(el=>el.disabled=false)}}
+async function legacySave(action,p){if(busy)return;busy=true;++refreshVersion;loading=false;showRefreshState();const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(el=>!el.disabled);controls.forEach(el=>el.disabled=true);notice('保存中…');try{data=applySaveResult(data,await rpc('saveData',memberId,action,p,{response:'patch-v1'}));cacheSnapshot();modalDirty=false;$('modal').close();render();notice('保存しました')}catch(e){if(action==='attendance')detail();notice(e.message)}finally{busy=false;controls.forEach(el=>el.disabled=false)}}
+let confirmedData=null,outbox=[],sending=false,recoveringOutbox=false,queueLease=null;
+async function acquireQueueLease(){
+  if(queueLease)return true;
+  if(typeof navigator==='undefined'||!navigator.locks)return false;
+  let ready;const result=new Promise(resolve=>ready=resolve);
+  navigator.locks.request(outboxKey(),{ifAvailable:true},lock=>{
+    if(!lock){ready(false);return}
+    return new Promise(release=>{queueLease=()=>{queueLease=null;release()};ready(true)});
+  }).catch(()=>ready(false));
+  return result;
+}
+function releaseQueueLease(){if(queueLease)queueLease()}
+function outboxKey(){return 'ticket-outbox:'+window.LIVE_POCKET_CONFIG.gasUrl+':'+memberId}
+function persistOutbox(){
+  if(outbox.length)localStorage.setItem(outboxKey(),JSON.stringify({base:confirmedData,items:outbox}));
+  else localStorage.removeItem(outboxKey());
+}
+function restoreOutbox(){try{
+  const saved=JSON.parse(localStorage.getItem(outboxKey())||'null');
+  if(saved?.base?.me?.id!==memberId||!Array.isArray(saved.items)||!saved.items.length)return false;
+  confirmedData=saved.base;outbox=saved.items.map(item=>({...item,state:item.state==='sending'?'queued':item.state}));
+  cachedView=true;recoveringOutbox=true;rebuildOptimistic();return true;
+}catch(e){return false}}
+function operationKey(action,p){return action==='live'?'live:'+(p.id||'new'):action==='attendance'?'attendance:'+p.liveId:action==='addTickets'?'add:'+p.liveId:'ticket:'+p.id}
+function optimisticPatch(base,item){
+  const p=item.payload,id='pending-'+item.id,version=String(Number(p.version||0)+1);
+  let table,row,remove=[];
+  if(item.action==='live'){table='Lives';row={...p,id:p.id||id,owner:base.me.id,version,groups:p.groups||[]};}
+  else if(item.action==='attendance'){table='Attendance';const old=base.attendance.find(a=>a.liveId===p.liveId&&a.memberId===base.me.id);row={id:old?.id||id,liveId:p.liveId,memberId:base.me.id,status:p.status,version};}
+  else if(item.action==='addTickets')return {kind:'patch-v1',changes:{Tickets:{upsert:p.entries.map((e,i)=>({...e,id:id+'-'+i,liveId:p.liveId,memberId:base.me.id,recipient:'',memo:'',version:'1'})),remove:[]}}};
+  else {table='Tickets';if(item.action==='deleteTicket')remove=[p.id];else row={...base.tickets.find(t=>t.id===p.id),...p,version};}
+  return {kind:'patch-v1',changes:{[table]:{upsert:row?[row]:[],remove}}};
+}
+function rebuildOptimistic(){data=outbox.filter(item=>item.state!=='error').reduce((current,item)=>applySaveResult(current,optimisticPatch(current,item)),confirmedData)}
+function pendingDescription(item){const p=item.payload;if(item.action==='live')return 'イベント：'+p.title;if(item.action==='attendance')return '参戦予定：'+p.status;if(item.action==='addTickets')return p.entries.map(e=>e.number+'（'+e.status+'）').join('、');return (p.number||'チケット')+(item.action==='deleteTicket'?'を削除':'：'+p.status)}
+function syncPanel(){return outbox.length?`<section class="sync-panel" aria-label="保存状況"><strong>この端末の保存状況</strong>${outbox.map(item=>`<div class="sync-item"><span>${esc(pendingDescription(item))}</span><b>${item.state==='error'?'保存未確認':item.state==='sending'?'保存中…':'送信待ち'}</b>${item.error?`<p>${esc(item.error.replace('SAVE_UNCERTAIN: ',''))}</p>`:''}${item.state==='error'?`<div class="actions">${item.error?.includes('SAVE_UNCERTAIN')?'':`<button data-retry-save="${esc(item.id)}">再送</button>`}<button data-discard-save="${esc(item.id)}">保留を解除</button></div>`:''}</div>`).join('')}<p>「保存しました」と表示されるまでは、他の人への反映は未確認です。</p></section>`:''}
+function bindSyncPanel(){
+  document.querySelectorAll('[data-retry-save]').forEach(b=>b.onclick=()=>{const item=outbox.find(i=>i.id===b.dataset.retrySave);if(!item||sending)return;item.state='queued';item.error='';try{persistOutbox()}catch(e){notice('端末に保存できません。空き容量を確認してください');return}rebuildOptimistic();render();processOutbox()});
+  document.querySelectorAll('[data-discard-save]').forEach(b=>b.onclick=()=>{if(sending)return;if(!confirm('入力の保留を解除します。既にスプシに保存された変更は取り消されません。再読込で確認してください。'))return;outbox=outbox.filter(i=>i.id!==b.dataset.discardSave);try{persistOutbox()}catch(e){notice('保留の更新に失敗しました');return}rebuildOptimistic();render();if(outbox.length)processOutbox();else {releaseQueueLease();refresh()}});
+}
+async function processOutbox(){
+  if(sending||!outbox.length||outbox[0].state==='error')return;
+  if(!await acquireQueueLease()){notice('別のタブで保存中です。そのタブで保存状況を確認してください。');return}
+  if(sending||!outbox.length||outbox[0].state==='error')return;
+  sending=true;const item=outbox[0],owner=memberId;
+  ++refreshVersion;loading=false;item.state='sending';
+  try{
+    persistOutbox();if(!$('modal').open)render();
+    const result=await rpc('saveData',owner,item.action,item.payload,{response:'patch-v1',requestId:item.id});
+    confirmedData=applySaveResult(confirmedData,result);
+    outbox.shift();
+    try{persistOutbox()}catch(e){notice('保存は完了しましたが端末の保留情報を更新できません。再読込時に保存結果を再確認します。')}
+    rebuildOptimistic();cacheSnapshot();if(!$('modal').open)render();notice('保存しました');
+  }catch(e){item.state='error';item.error=e.message;try{persistOutbox()}catch(_){}rebuildOptimistic();if(!$('modal').open)render();notice('保存を確認できません。保存状況から再送・確認できます。');}
+  finally{sending=false;}
+  if(!outbox.length)releaseQueueLease();
+  if(outbox.length&&outbox[0].state!=='error')processOutbox();
+  else if(!outbox.length&&recoveringOutbox){recoveringOutbox=false;refresh()}
+}
+async function save(action,p){
+  if(!data?.capabilities?.durableSave||typeof navigator==='undefined'||!navigator.locks)return legacySave(action,p);
+  if(busy)return;
+  if(String(p.id||p.liveId||'').startsWith('pending-')){notice('このイベント・チケットの保存完了後に変更できます');return}
+  const key=operationKey(action,p);
+  if(outbox.some(item=>item.key===key)){notice('同じ項目の変更が保留中です。保存状況を確認してください');return}
+  if(outbox.length>=30){notice('保留中の保存が多いため、先に保存状況を確認してください');return}
+  busy=true;const acquired=await acquireQueueLease();busy=false;
+  if(!acquired){notice('別のタブで保存中です。そのタブの保存が終わってから再度保存してください');return}
+  try{if(!outbox.length && localStorage.getItem(outboxKey())){
+    if(restoreOutbox()){notice('以前の保存を先に確認します。入力はこの画面に残っています。');processOutbox();return}
+  }}catch(e){releaseQueueLease();notice('端末への保管が利用できません。入力はこの画面に残っています。');return}
+  if(!confirmedData)confirmedData=data;
+  const item={id:crypto.randomUUID(),key,action,payload:JSON.parse(JSON.stringify(p)),state:'queued'};
+  outbox.push(item);
+  try{persistOutbox()}catch(e){outbox.pop();if(!outbox.length)releaseQueueLease();notice('端末に入力を保管できないため送信していません。入力はこの画面に残っています。');return}
+  ++refreshVersion;loading=false;rebuildOptimistic();modalDirty=false;$('modal').close();render();notice('画面に反映しました。スプシへ保存中…');processOutbox();
+}
+
 function rememberMember(id){if(id!==memberId){++refreshVersion;loading=false;try{sessionStorage.removeItem('ticket-snapshot')}catch(e){}}memberId=id;try{if(id)localStorage.setItem('live-pocket-member',id);else localStorage.removeItem('live-pocket-member')}catch(e){}}
 function memberMessage(message){const el=$('member-message');if(el)el.textContent=message;else notice(message)}
 async function chooseMemberScreen(){
@@ -150,9 +231,9 @@ function sortedEvents(lives,today){return [...lives].sort((a,b)=>eventRank(a,tod
 function safeLink(url,label,sheet=false){const valid=sheet?/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url||''):/^https?:\/\/[a-zA-Z0-9.-]+(?::[0-9]+)?(?:[/?#][^\s<>]*)?$/.test(url||'');return valid?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`:`<p class="muted">${label}：未設定</p>`}
 function eventTile(l,tickets,today){const after=Boolean(l.lotteryDeadline)&&today>l.lotteryDeadline;const rank=eventRank(l,today);const labels=['本日開催','本日抽選締切','明日抽選締切'];const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline||'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}`;return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''}" data-event="${esc(l.id)}">${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}<span class="date">${esc(l.date.replaceAll('-','.'))}</span><h2>${esc(l.title)}</h2>${groupTags(l)}<p class="muted">${esc(l.venue||'会場未登録')}</p>${extra}${attendanceDropdown(l)}<button data-live="${esc(l.id)}">詳細・番号登録</button>${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}">イベント編集</button>`:''}</article>`}
 function render(){if(!data)return;const today=japanDay();lastDay=today;const lives=sortedEvents(data.lives.filter(l=>l.date>=today),today);if(selected&&!lives.some(x=>x.id===selected))selected='';
-$('account').innerHTML=`<span class="account-name">${esc(data.me.name)}</span><button id="logout">名前を変更</button>`;$('logout').onclick=()=>{if(busy)return;rememberMember('');notice('');chooseMemberScreen()};
-$('app').innerHTML=`<div class="top"><div><span class="date">YOUR LIVE BOARD</span><h1 style="margin-top:6px">${selected?'イベント詳細':'イベント一覧'}</h1></div><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>${selected?'<button class="back" id="back">← イベント一覧に戻る</button><section id="detail" class="detail-page"></section>':`<label for="search">イベントを探す</label><input id="search" class="search" placeholder="イベント名・会場・グループ" value="${esc(searchQuery)}"><div class="view-switch" role="group" aria-label="表示方法"><button data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button data-view="tiles" aria-pressed="${viewMode==='tiles'}">タイル</button></div><div class="event-grid ${viewMode==='list'?'event-list':''}" id="lives"></div><p id="empty-events" class="empty" hidden></p>`}<p class="foot">最終読込 ${cachedView?'前回の表示（未更新） · ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}（日本時間）</p>`;
-$('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();if(selected){$('back').onclick=returnHome;detail()}else{drawTiles(lives,today);$('search').oninput=e=>{searchQuery=e.target.value;drawTiles(lives,today)};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{viewMode=b.dataset.view;try{localStorage.setItem('ticket-view-mode',viewMode)}catch(e){}render()})}showRefreshState()}
+$('account').innerHTML=`<span class="account-name">${esc(data.me.name)}</span><button id="logout">名前を変更</button>`;$('logout').onclick=()=>{if(busy)return;if(outbox.length){notice('保存の保留を解決してから名前を変更してください');return}confirmedData=null;rememberMember('');notice('');chooseMemberScreen()};
+$('app').innerHTML=`${syncPanel()}<div class="top"><div><span class="date">YOUR LIVE BOARD</span><h1 style="margin-top:6px">${selected?'イベント詳細':'イベント一覧'}</h1></div><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>${selected?'<button class="back" id="back">← イベント一覧に戻る</button><section id="detail" class="detail-page"></section>':`<label for="search">イベントを探す</label><input id="search" class="search" placeholder="イベント名・会場・グループ" value="${esc(searchQuery)}"><div class="view-switch" role="group" aria-label="表示方法"><button data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button data-view="tiles" aria-pressed="${viewMode==='tiles'}">タイル</button></div><div class="event-grid ${viewMode==='list'?'event-list':''}" id="lives"></div><p id="empty-events" class="empty" hidden></p>`}<p class="foot">最終読込 ${cachedView?'前回の表示（未更新） · ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}（日本時間）</p>`;
+$('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();if(selected){$('back').onclick=returnHome;detail()}else{drawTiles(lives,today);$('search').oninput=e=>{searchQuery=e.target.value;drawTiles(lives,today)};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{viewMode=b.dataset.view;try{localStorage.setItem('ticket-view-mode',viewMode)}catch(e){}render()})}showRefreshState();bindSyncPanel()}
 function drawTiles(lives,today){const q=searchQuery.toLowerCase();const visible=lives.filter(l=>(l.title+' '+l.venue+' '+(l.groups||[]).join(' ')).toLowerCase().includes(q));$('lives').innerHTML=visible.map(l=>eventTile(l,data.tickets,today)).join('');$('empty-events').hidden=visible.length>0;$('empty-events').textContent=lives.length?'該当するイベントはありません。':'「＋ イベント登録」からイベントを登録してください。';document.querySelectorAll('[data-live]').forEach(b=>b.onclick=()=>openEvent(b.dataset.live));document.querySelectorAll('[data-edit-live]').forEach(b=>b.onclick=()=>liveForm(data.lives.find(l=>l.id===b.dataset.editLive)))}
 
 function canEditLive(l){return l.owner===data.me.id||!data.members.some(m=>m.id===l.owner)}
@@ -210,5 +291,5 @@ function ticketForm(t){modal('チケットを編集',field('整理番号','numbe
 function showSetup(){ $('account').textContent='';$('app').innerHTML='<div class="card login"><span class="date">Ticket Management</span><h1 style="margin-top:12px">初期設定を準備中です</h1><p>イベント・チケットの保存先を接続すると利用できます。</p><p class="muted">幹事の方は設定手順に沿ってGASを公開し、そのURLを設定してください。メンバーの方の設定は不要です。</p><a href="https://github.com/M0CH4771/ticket-management#最初の設定" target="_blank" rel="noopener">設定手順を見る ↗</a></div>'}
 window.addEventListener('popstate',handleHistory);
 if(history.state?.ticketView==='detail')selected=history.state.id;else history.replaceState({ticketView:'home'},'',location.href);
-if(!window.LIVE_POCKET_CONFIG?.gasUrl)showSetup();else if(memberId){if(restoreSnapshot())render();refresh()}else chooseMemberScreen();
+if(!window.LIVE_POCKET_CONFIG?.gasUrl)showSetup();else if(memberId){if(restoreOutbox()){render();processOutbox()}else{if(restoreSnapshot()){confirmedData=data;render()}refresh()}}else chooseMemberScreen();
 </script></body></html>
