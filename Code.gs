@@ -150,7 +150,7 @@ function registerMember(name) {
 }
 // Request-local reuse only: a manual reload always reads the current spreadsheet.
 let requestBook=null,requestSheets={},requestTables={},requestChanges={};
-function resetRequest_() { requestBook=null;requestSheets={};requestTables={};requestChanges={}; }
+function resetRequest_() { requestReceipt=null;requestBook=null;requestSheets={};requestTables={};requestChanges={}; }
 function sheet_(name) {
   if(!requestBook) requestBook=SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID'));
   return requestSheets[name]||(requestSheets[name]=requestBook.getSheetByName(name));
@@ -189,7 +189,7 @@ function validateGroups_(value) {
 function snapshot_(me) {
   const lives=rows_('Lives').filter(l=>l.id&&l.title&&normalizeDate_(l.date,Number(japanToday_().slice(0,4)))).map(l=>({...l,groups:readGroups_(l.groups)}));
   const groups=[...new Set(lives.flatMap(l=>l.groups))].sort((a,b)=>a.localeCompare(b,'ja'));
-  return {me:{id:me.id,name:me.name},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives,groups,attendance:rows_('Attendance'),tickets:rows_('Tickets'),updatedAt:new Date().toISOString()};
+  return {me:{id:me.id,name:me.name},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives,groups,attendance:rows_('Attendance'),tickets:rows_('Tickets'),capabilities:{durableSave:true},updatedAt:new Date().toISOString()};
 }
 function getData(memberId) { ensureReady_(); return snapshot_(selectedMember_(memberId)); }
 function text_(value,max,required) { const s=String(value==null?'':value).trim(); if ((required&&!s)||s.length>max) throw new Error('入力内容・文字数を確認してください'); return s; }
@@ -225,6 +225,7 @@ function migrateLives_() {
 function enum_(value,values) { if (!values.includes(value)) throw new Error('選択値が無効です'); return value; }
 function safe_(v) { const s=String(v); return /^[=+\-@]/.test(s)?"'"+s:s; }
 function write_(table,row,old) {
+  prepareSave_();
   const s=sheet_(table); const vals=TABLES[table].map(k=>safe_(row[k]??''));
   if (!old) s.appendRow(vals);
   else { const index=rows_(table).findIndex(x=>x.id===old.id); if(index<0) throw new Error('データが見つかりません'); s.getRange(index+2,1,1,vals.length).setValues([vals]); }
@@ -237,13 +238,44 @@ function recordChange_(table,row) {
   if(!requestChanges[table]) requestChanges[table]={upsert:[],remove:[]};
   requestChanges[table].upsert.push(normalized);
 }
+// A durable receipt makes retrying a lost response safe. An interrupted write
+// without a completion receipt is never automatically repeated.
+let requestReceipt=null;
+function receiptSheet_() {
+  if(!requestBook) sheet_('Members');
+  let s=requestBook.getSheetByName('SaveRequests');
+  if(!s){s=requestBook.insertSheet('SaveRequests');s.appendRow(['リクエストID','メンバーID','操作','入力','状態','結果','日時']);}
+  return s;
+}
+function prepareSave_() {
+  if(!requestReceipt||requestReceipt.prepared)return;
+  const r=requestReceipt;
+  r.sheet.appendRow([r.id,r.member,r.action,r.payload,'pending','',new Date().toISOString()]);
+  r.row=r.sheet.getLastRow();
+  SpreadsheetApp.flush(); // Persist intent before changing user data.
+  r.prepared=true;
+}
 function saveData(memberId,action,payload,options) {
   // Save only the requested change; bulk import/cleanup run on reload or daily trigger.
+  requestReceipt=null;
   ensureReady_(false);
   const lock=LockService.getScriptLock(); if(!lock.tryLock(10000)) throw new Error('更新が混み合っています。少し待って再度保存してください');
   try {
     requestTables={}; // Discard reads made before this write lock.
     const me=selectedMember_(memberId); const p=payload||{};
+    if(options?.requestId){
+      const id=String(options.requestId);
+      if(!/^[a-f0-9-]{36}$/.test(id))throw new Error('保存リクエストが不正です');
+      const sheet=receiptSheet_(),body=JSON.stringify(p);
+      if(body.length>20000)throw new Error('一度に送信する内容が大きすぎます');
+      const receipt=sheet.getDataRange().getDisplayValues().slice(1).find(row=>row[0]===id);
+      if(receipt){
+        if(receipt[1]!==me.id||receipt[2]!==action||receipt[3]!==body)throw new Error('保存リクエストが一致しません');
+        if(receipt[4]==='done')return JSON.parse(receipt[5]);
+        throw new Error('SAVE_UNCERTAIN: 前回の保存結果を確認する必要があります。再読込して登録内容を確認してください。');
+      }
+      requestReceipt={sheet,id,member:me.id,action,payload:body,prepared:false};
+    }
     if (action==='live') {
       const old=p.id?rows_('Lives').find(x=>x.id===p.id):null;
       if(p.id&&!old) throw new Error('ライブが見つかりません');
@@ -278,12 +310,13 @@ function saveData(memberId,action,payload,options) {
         if(new Set(named).size!==named.length||named.some(n=>existing.includes(n))) throw new Error('このライブに同じ整理番号が登録されています。券種が異なる場合は「VIP-A12」などにしてください');
         const added=entries.map(({number,status})=>({id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,number,status,recipient:'',memo:'',version:1}));
         const values=added.map(row=>TABLES.Tickets.map(k=>safe_(row[k])));
+        prepareSave_();
         const s=sheet_('Tickets');s.getRange(s.getLastRow()+1,1,values.length,TABLES.Tickets.length).setValues(values);invalidate_('Tickets');added.forEach(row=>recordChange_('Tickets',row));
       } else if(action==='ticket' || action==='deleteTicket') {
         const old=rows_('Tickets').find(t=>t.id===p.id&&t.liveId===p.liveId);
         if(!old||old.memberId!==me.id) throw new Error('選択中の名前のチケットのみ編集できます');
         if(String(p.version)!==old.version) throw new Error('他の更新がありました。再読込してください');
-        if(action==='deleteTicket') { sheet_('Tickets').deleteRow(rows_('Tickets').findIndex(t=>t.id===old.id)+2);invalidate_('Tickets');requestChanges.Tickets={upsert:[],remove:[old.id]}; }
+        if(action==='deleteTicket') { prepareSave_();sheet_('Tickets').deleteRow(rows_('Tickets').findIndex(t=>t.id===old.id)+2);invalidate_('Tickets');requestChanges.Tickets={upsert:[],remove:[old.id]}; }
         else {
           const status=enum_(p.status,['未発券','自分用','余り','取引中','捌けた']);
           const number=text_(p.number,30,status!=='未発券');
@@ -294,7 +327,12 @@ function saveData(memberId,action,payload,options) {
     }
     SpreadsheetApp.flush();
     // Old clients still receive a full snapshot. New clients request a compact receipt.
-    if(options?.response==='patch-v1') return {kind:'patch-v1',changes:requestChanges,savedAt:new Date().toISOString()};
+    const result={kind:'patch-v1',changes:requestChanges,savedAt:new Date().toISOString()};
+    if(requestReceipt?.prepared){
+      requestReceipt.sheet.getRange(requestReceipt.row,5,1,2).setValues([['done',JSON.stringify(result)]]);
+      SpreadsheetApp.flush();
+    }
+    if(options?.response==='patch-v1') return result;
     return snapshot_(me);
   } finally { lock.releaseLock(); }
 }
