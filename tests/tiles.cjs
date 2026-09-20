@@ -24,3 +24,21 @@ assert.ok(!c.eventTile({...l,owner:'other'},[],'2026-09-19').includes('data-edit
 assert.ok(!script.includes('setInterval('));
 assert.ok(!script.includes('60秒ごと'));
 console.log('PASS: edit buttons for owned/imported events, other-owner guard, no periodic refresh');
+
+vm.runInContext("data={me:{id:'me'},members:[{id:'me',name:'本人'},{id:'other',name:'<友人>'},{id:'pending',name:'未回答の人'}],attendance:[{liveId:'event',memberId:'me',status:'参戦'},{liveId:'event',memberId:'other',status:'不参加'}]};",c);
+const dropdown=c.attendanceDropdown({id:'event'});
+assert.ok(dropdown.includes('1人参戦'));assert.ok(dropdown.includes('不参加'));assert.ok(dropdown.includes('未回答'));assert.ok(dropdown.includes('&lt;友人&gt;'));
+const otherDropdown=c.attendanceDropdown({id:'different'});assert.ok(otherDropdown.includes('0人参戦'));
+let renders=0,requests=0,historyBack=0;
+c.window={scrollY:240,scrollTo(){}};c.location={pathname:'/app',search:''};
+c.document={getElementById:()=>({open:false})};
+c.history={state:{ticketView:'home'},pushState(state){this.state=state},replaceState(state){this.state=state},back(){historyBack++;this.state={ticketView:'home'};c.handleHistory()}};
+c.render=()=>renders++;c.rpc=()=>{requests++;throw Error('unexpected request')};
+c.openEvent('event');assert.equal(c.history.state.id,'event');c.returnHome();
+assert.equal(historyBack,1);assert.equal(renders,2);assert.equal(requests,0);
+const storage={};c.sessionStorage={setItem:(k,v)=>storage[k]=v,getItem:k=>storage[k]||null};c.window.LIVE_POCKET_CONFIG={gasUrl:'endpoint'};
+vm.runInContext("memberId='me';data={me:{id:'me'},lives:[],members:[],tickets:[],attendance:[]};",c);
+c.cacheSnapshot();assert.equal(c.restoreSnapshot(),true);
+vm.runInContext("memberId='other';",c);assert.equal(c.restoreSnapshot(),false);
+vm.runInContext("memberId='me';",c);c.window.LIVE_POCKET_CONFIG.gasUrl='different';assert.equal(c.restoreSnapshot(),false);
+console.log('PASS: attendance per event including unanswered/escaping, browser back without RPC, cache member/endpoint isolation');
