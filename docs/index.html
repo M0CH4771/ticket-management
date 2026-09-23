@@ -232,7 +232,7 @@ async function refresh(){
     if(version!==refreshVersion||memberId!==requestedMember)return;
     confirmedData=result;rebuildOptimistic();cachedView=false;cacheSnapshot();notice('');
     // A background reply must never rebuild a form the user has started editing.
-    if(!$('modal').open)render();
+    if(!$('modal').open)render();else refreshTicketManager();
   }catch(e){
     if(version!==refreshVersion||memberId!==requestedMember)return;
     if(!data){rememberMember('');await chooseMemberScreen()}
