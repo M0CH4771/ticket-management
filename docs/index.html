@@ -209,6 +209,50 @@ dialog::backdrop{background:#20282080}
 html{scrollbar-gutter:stable}
 .my-ticket-summary{text-align:left;width:100%;font-size:13px;font-weight:400;overflow-wrap:anywhere;background:#f4f7fc;border-color:#d9e2f2;padding:10px}.my-ticket-summary span{display:block;margin-top:4px}.event-list .my-ticket-summary{grid-column:1 / -1}.copy-surplus{font-size:13px;min-height:44px;background:white;color:#4b515b}.event-list .copy-surplus{grid-column:1 / -1;justify-self:start}.my-filters{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}.my-filters button{font-size:13px;min-height:44px;padding:8px 12px}.my-filters [aria-pressed=true]{background:#175cd3;color:white;border-color:#175cd3}.status-label{margin:0 0 4px;font-size:12px}.manager-tickets select{padding:8px;min-height:44px}.manager-tickets .ticket{grid-template-columns:minmax(40px,.7fr) minmax(100px,1.5fr) auto}
 .my-surplus-list{margin-top:14px;width:100%;text-align:left;font-weight:700;color:#175cd3}.surplus-event{border-top:1px solid #cdd1d8;padding:16px 0}.surplus-event h3{margin:6px 0;font-size:17px;overflow-wrap:anywhere}.surplus-event p{margin:6px 0 12px}.surplus-numbers{font-weight:700;overflow-wrap:anywhere}.surplus-numbers span{font-weight:400;font-size:13px}.duplicate-warning:empty{display:none}.duplicate-warning{background:#fff4e5;border:1px solid #dcb67a;padding:12px;margin:12px 0;font-size:14px;overflow-wrap:anywhere}.duplicate-warning ul{padding-left:20px}.duplicate-ack{display:flex;align-items:flex-start;gap:10px;font-weight:400;cursor:pointer;min-height:44px}.duplicate-ack input{width:20px;height:20px;min-height:20px;flex:0 0 20px;margin-top:3px}.duplicate-event{font-size:12px;min-height:44px;margin-top:4px}
+/* Compact event rows: related controls share a row instead of stacking. */
+.event-personal{min-width:0;display:grid;grid-template-columns:minmax(85px,.7fr) minmax(0,1.3fr);gap:10px;align-items:end}
+.event-personal .my-attendance{margin:0}.event-personal .my-attendance label{margin:0 0 4px}
+.event-personal .my-ticket-summary{min-height:44px;padding:7px 9px;line-height:1.5}
+.event-tools{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+.event-tools .edit-event,.event-tools .duplicate-event{margin:0;padding:8px 12px;min-height:44px;align-self:auto;font-size:13px}
+.event-footer{position:relative;min-width:0}
+.event-footer .tile-attendance summary{padding-right:110px;min-height:44px}
+.event-footer .copy-surplus{position:absolute;right:0;top:1px;width:105px;min-height:44px;margin:0;padding:7px 4px;border:0;background:transparent;font-size:12px}
+.event-list .event-personal,.event-list .event-footer{grid-column:1 / -1}
+.event-list .event-actions{grid-column:1;width:100%}
+.event-list .event-tools{grid-column:2}
+.event-list .event-personal{grid-template-columns:140px minmax(0,1fr)}
+.event-list .my-ticket-summary span{display:inline;margin-left:12px}
+.event-list .event-personal .my-ticket-summary{grid-column:auto}
+.event-list .tile-attendance summary span{display:inline;margin-left:8px}
+@media(max-width:620px){
+ header{padding:9px 12px;gap:6px}.brand{font-size:14px;letter-spacing:-.3px}#account{font-size:13px}#logout{font-size:12px;min-height:40px;padding:6px 8px}
+ main{padding:12px 10px 24px}.top{flex-wrap:wrap;gap:6px}.top h1{font-size:19px}.top .actions{width:auto;gap:6px}.top .actions button{font-size:12px;white-space:nowrap;padding:7px 9px;min-height:40px}
+ .home-filters{gap:8px;margin-top:4px}.home-filters label{font-size:12px;margin:8px 0 4px}.home-filters input,.home-filters select{font-size:16px;min-height:42px;padding:7px}
+ .my-surplus-list{font-size:13px;margin-top:8px;min-height:42px;padding:8px 10px}.my-filters{margin-top:8px;gap:4px}.my-filters button{font-size:12px;padding:7px 9px;min-height:42px}
+ .results-toolbar{margin-top:6px}.results-toolbar .view-switch button{font-size:12px;min-height:40px;padding:7px 10px}.event-grid{margin-top:8px}
+ .event-tile .event-overview h2{font-size:14px;line-height:1.45;margin-bottom:3px}.event-tile .event-dateline{margin-bottom:4px;gap:6px}.event-tile .event-dateline .date{font-size:15px}.event-tile .event-dateline .badge{font-size:10px;padding:3px 5px}
+ .event-tile .event-venue{font-size:12px;margin:3px 0}.event-tile .group-tags{margin:4px 0 0;gap:4px}.event-tile .group-tag{font-size:11px;line-height:1.4;padding:2px 5px}
+ .event-memo{font-size:12px;margin-top:4px;display:flex;gap:6px}.event-memo .note{margin:0}
+ .event-tile .event-facts dt{font-size:11px}.event-tile .event-facts dd{font-size:15px;line-height:1.4;white-space:nowrap}.event-tile .event-facts>a,.event-tile .event-facts>p{font-size:12px}
+ .event-personal{grid-template-columns:1fr;gap:5px}.event-personal .my-attendance label{font-size:11px;margin-bottom:3px}.event-personal .my-attendance select{font-size:16px;min-height:42px;padding:7px 8px}.event-personal .my-ticket-summary{font-size:12px;min-height:42px;padding:6px 8px}
+ .event-tools .edit-event,.event-tools .duplicate-event{font-size:12px;padding:7px 9px;min-height:42px}
+ .event-tile .event-actions button{font-size:12px;min-height:42px;padding:8px}
+ .event-footer .tile-attendance summary{font-size:12px;padding-right:94px}.event-footer .copy-surplus{width:90px;font-size:11px}
+ .event-grid:not(.event-list) .event-footer .tile-attendance summary{padding-right:0}.event-grid:not(.event-list) .event-footer .copy-surplus{position:static;width:100%;border-top:1px solid #e5e7eb}
+ .event-list .card.event-tile{grid-template-columns:minmax(0,1fr) 114px;padding:10px 11px;gap:6px 8px}
+ .event-list .event-overview{grid-column:1 / -1;grid-row:auto}
+ .event-list .event-facts{grid-column:1 / -1;grid-row:auto;display:flex;align-items:center;flex-wrap:wrap;gap:2px 12px}
+ .event-list .event-facts dl{display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 7px;border:0;padding:0;grid-row:auto}
+ .event-list .event-facts dt:not(:first-child){margin:0 0 0 5px}.event-list .event-facts dd{margin:0;font-size:14px;font-weight:600}
+ .event-list .event-facts>a,.event-list .event-facts>p{padding:0;margin:0;min-height:0}.event-list .event-facts>a{min-height:36px;display:inline-flex;align-items:center}
+ .event-list .event-personal{grid-template-columns:105px minmax(0,1fr);gap:8px;align-items:center}
+ .event-list .event-personal .my-attendance{display:flex;align-items:center;gap:5px}.event-list .event-personal .my-attendance label{font-size:11px;width:24px;flex:0 0 24px;line-height:1.35;margin:0}.event-list .event-personal .my-attendance select{padding:6px 2px;font-size:16px}
+ .event-list .my-ticket-summary span{display:block;margin:1px 0 0}.event-list .event-personal .my-ticket-summary{background:transparent;border:0;padding:2px 4px;font-size:12px}
+ .event-list .event-tools{gap:4px;justify-content:flex-end}.event-list .event-tools button{flex:1;min-width:0;margin:0;padding:7px 6px}
+ .event-list .event-actions{grid-column:1;grid-template-columns:1fr;width:100%}.event-list .event-footer{grid-column:1 / -1}
+ .event-list .tile-attendance summary{padding-top:9px;padding-bottom:9px}.event-list .tile-attendance summary span{font-size:11px;margin-left:4px}
+}
 </style></head><body><header><div class="brand">Ticket Management</div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=832f55ba"></script>
 <script src="./transport.js"></script>
@@ -223,7 +267,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const statuses=['未発券','自分用','余り','取引中','捌けた'];
 const opts=(a,v)=>a.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
 const field=(label,name,value='',type='text',required=false)=>`<label for="f-${name}">${label}${required?'<span class="required">必須</span>':''}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''}>`;
-const liveRequirements=l=>`<span style="display:block;margin-top:8px;line-height:1.7" class="muted">抽選締切：${esc(l.lotteryDeadline||'未設定')}<br>投げ数：${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</span>`;
+const liveRequirements=l=>`<span style="display:block;margin-top:8px;line-height:1.7" class="muted">抽選締切：${esc(l.lotteryDeadline?eventDateLabel(l.lotteryDeadline):'未設定')}<br>投げ数：${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</span>`;
 const groupTags=l=>(l.groups||[]).length?`<div class="group-tags" aria-label="出演グループ">${l.groups.map(g=>`<span class="group-tag">${esc(g)}</span>`).join('')}</div>`:'';
 const badge=s=>`<span class="badge ${s==='余り'?'available':s==='取引中'?'pending':s==='捌けた'?'done':''}">${esc(s)}</span>`;
 function notice(s){clearTimeout(noticeTimer);$('notice').textContent=s;const inline=$('form-message');if(inline)inline.textContent=s; if(s==='保存しました'){noticeTimer=setTimeout(()=>{$('notice').textContent=''},3000)}}
@@ -419,15 +463,16 @@ function eventTile(l,tickets,today){
   const after=Boolean(l.lotteryDeadline)&&today>l.lotteryDeadline,rank=eventRank(l,today);
   const labels=['本日開催','本日抽選締切','明日抽選締切'];
   const mine=(data.attendance||[]).find(a=>a.liveId===l.id&&a.memberId===data.me.id)?.status||'未回答';
-  const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline||'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}`;
+  const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline?eventDateLabel(l.lotteryDeadline):'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}`;
   return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''}" data-event="${esc(l.id)}">
     <div class="event-overview"><div class="event-dateline"><time class="date" datetime="${esc(l.date)}" title="${esc(l.date)}">${esc(eventDateLabel(l.date))}</time>${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}</div>
     <h2>${esc(l.title)}</h2><p class="muted event-venue">${esc(l.venue||'会場未登録')}</p>${groupTags(l)}
-    <div class="my-attendance"><label for="attendance-${esc(l.id)}">自分の参戦予定</label><select id="attendance-${esc(l.id)}" data-attendance="${esc(l.id)}"><option value="" disabled ${mine==='未回答'?'selected':''}>未回答</option>${opts(['参戦','未定','不参加'],mine)}</select></div>${l.memo?`<div class="event-memo"><span class="muted">メモ</span><p class="note">${esc(l.memo)}</p></div>`:''}</div>
-    <div class="event-facts">${extra}${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}" aria-label="${esc(l.title)}を編集">イベント編集</button>`:''}<button class="duplicate-event" data-duplicate-live="${esc(l.id)}" aria-label="${esc(l.title)}を複製して登録">複製して登録</button></div>
-    <button class="my-ticket-summary" data-register="${esc(l.id)}" aria-label="${esc(l.title)}の自分の番号を確認">${myTicketSummary(l.id)}</button>
+    ${l.memo?`<div class="event-memo"><span class="muted">メモ</span><p class="note">${esc(l.memo)}</p></div>`:''}</div>
+    <div class="event-facts">${extra}</div>
+    <div class="event-personal"><div class="my-attendance"><label for="attendance-${esc(l.id)}">予定</label><select aria-label="自分の参戦予定" id="attendance-${esc(l.id)}" data-attendance="${esc(l.id)}"><option value="" disabled ${mine==='未回答'?'selected':''}>未回答</option>${opts(['参戦','未定','不参加'],mine)}</select></div><button class="my-ticket-summary" data-register="${esc(l.id)}" aria-label="${esc(l.title)}の自分の番号を確認">${myTicketSummary(l.id)}</button></div>
     <div class="event-actions"><button class="register-ticket" data-register="${esc(l.id)}" aria-label="${esc(l.title)}の番号を登録・編集">番号登録・編集</button></div>
-    ${attendanceDropdown(l)}<button class="copy-surplus" data-copy-surplus="${esc(l.id)}">余り情報をコピー</button>
+    <div class="event-tools">${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}" aria-label="${esc(l.title)}を編集">編集</button>`:''}<button class="duplicate-event" data-duplicate-live="${esc(l.id)}" aria-label="${esc(l.title)}を複製して登録">複製</button></div>
+    <div class="event-footer">${attendanceDropdown(l)}<button class="copy-surplus" data-copy-surplus="${esc(l.id)}">余りをコピー</button></div>
   </article>`;
 }
 function render(){
