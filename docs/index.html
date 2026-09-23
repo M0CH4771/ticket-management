@@ -127,6 +127,64 @@ dialog::backdrop{background:#20282080}
   .event-list .event-tile dl{padding:0 0 0 10px}
   dialog{border-radius:10px 10px 0 0}
 }
+
+/* Event scanning and action hierarchy */
+.home-filters{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;margin-top:8px}
+.home-filters label{font-size:13px;margin:12px 0 6px}
+.home-filters .search{margin:0}
+.results-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #d9dcd5;margin-top:14px}
+.results-info{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:#62695d}
+#clear-filters{font-size:12px;padding:6px 8px;border:0;background:transparent;text-decoration:underline;min-height:44px;color:#376149}
+.results-toolbar .view-switch{border:0;margin:0;flex-shrink:0}
+.event-grid{margin-top:14px;align-items:start}
+.event-overview{min-width:0}
+.event-dateline{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.event-dateline .date{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.event-tile .event-overview h2{margin:0 0 6px}
+.event-venue{line-height:1.5}
+.event-tile .my-attendance{font-size:12px;color:#666d64;margin-top:8px}
+.my-attendance strong{font-weight:600;color:#353e30;margin-left:5px}
+.event-tile .event-facts{min-width:0}
+.event-tile .event-facts dl{margin:0}
+.event-tile .event-facts>a{font-size:13px;min-height:44px}
+.event-tile .event-facts>p{font-size:12px;margin-top:8px}
+.event-tile .event-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto;min-width:0}
+.event-actions button{min-width:0;width:100%;margin:0;min-height:44px;padding:9px 8px;font-size:14px}
+.event-tile .register-ticket{background:#376149;color:#fff;border-color:#376149}
+.event-tile .register-ticket:hover{background:#294b37}
+.event-tile .edit-event{width:auto;justify-self:end;align-self:flex-end;padding:4px 8px;min-height:44px;font-size:12px;margin-top:-8px}
+.tile-attendance summary{font-size:13px;min-height:48px}
+.event-list .card.event-tile{grid-template-columns:minmax(0,1fr) 185px;gap:10px 20px;align-items:start}
+.event-list .event-overview{grid-column:1;grid-row:1}
+.event-list .event-facts{grid-column:2;grid-row:1}
+.event-list .event-facts dl{border-left:1px solid #e3e5de;padding-left:16px}
+.event-list .event-facts>a,.event-list .event-facts>p{padding-left:16px}
+.event-list .event-actions{grid-column:1 / -1;justify-self:start;width:min(100%,360px)}
+.event-list .tile-attendance{grid-column:1 / -1}
+.event-list .edit-event{grid-column:1 / -1}
+@media(max-width:620px){
+  .top{gap:10px}
+  .top .actions{width:auto}
+  .top .actions button{min-height:44px;font-size:13px;padding:9px 10px}
+  .top h1{font-size:21px}
+  .home-filters{gap:10px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .home-filters input,.home-filters select{padding:10px 8px;min-height:46px}
+  .results-toolbar .view-switch button{padding:8px 11px;font-size:13px}
+  .results-info{gap:0;font-size:12px}
+  .event-list .card.event-tile{grid-template-columns:minmax(0,1fr) 108px;gap:10px 12px}
+  .event-list .event-facts dl{padding-left:10px}
+  .event-list .event-facts>a,.event-list .event-facts>p{padding-left:10px}
+  .event-tile .event-dateline .date{font-size:16px}
+  .event-tile .event-dateline .badge{font-size:11px}
+  .event-tile .event-actions{grid-template-columns:1fr}
+  .event-list .event-actions{grid-template-columns:1fr 1fr;width:100%}
+  .event-tile .event-actions button{font-size:13px}
+  .event-tile .event-overview h2{font-size:15px}
+  .event-tile .group-tags{margin-top:7px}
+  .event-tile .my-attendance{font-size:12px}
+  .event-tile .tile-attendance summary{font-size:12px}
+}
+@media(max-width:360px){.top .actions{width:100%}.home-filters{grid-template-columns:1fr;gap:0}}
 </style></head><body><header><div class="brand">Ticket Management</div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=832f55ba"></script>
 <script src="./transport.js"></script>
@@ -287,12 +345,28 @@ function nextDay(day){return new Date(Date.parse(day+'T00:00:00Z')+86400000).toI
 function eventRank(l,today){if(l.date===today)return 0;if(l.lotteryDeadline===today)return 1;if(l.lotteryDeadline===nextDay(today))return 2;return 3}
 function sortedEvents(lives,today){return [...lives].sort((a,b)=>eventRank(a,today)-eventRank(b,today)||a.date.localeCompare(b.date)||a.title.localeCompare(b.title,'ja')||a.id.localeCompare(b.id))}
 function safeLink(url,label,sheet=false){const valid=sheet?/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url||''):/^https?:\/\/[a-zA-Z0-9.-]+(?::[0-9]+)?(?:[/?#][^\s<>]*)?$/.test(url||'');return valid?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`:`<p class="muted">${label}：未設定</p>`}
-function eventTile(l,tickets,today){const after=Boolean(l.lotteryDeadline)&&today>l.lotteryDeadline;const rank=eventRank(l,today);const labels=['本日開催','本日抽選締切','明日抽選締切'];const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline||'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}`;return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''}" data-event="${esc(l.id)}">${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}<span class="date">${esc(l.date.replaceAll('-','.'))}</span><h2>${esc(l.title)}</h2>${groupTags(l)}<p class="muted">${esc(l.venue||'会場未登録')}</p>${extra}${attendanceDropdown(l)}<button data-live="${esc(l.id)}">詳細・番号登録</button>${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}">イベント編集</button>`:''}</article>`}
+
+function eventDateLabel(value){const d=new Date(value+'T12:00:00+09:00');return Number.isFinite(d.getTime())?d.toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',weekday:'short'}):value}
+function eventTile(l,tickets,today){
+  const after=Boolean(l.lotteryDeadline)&&today>l.lotteryDeadline,rank=eventRank(l,today);
+  const labels=['本日開催','本日抽選締切','明日抽選締切'];
+  const mine=(data.attendance||[]).find(a=>a.liveId===l.id&&a.memberId===data.me.id)?.status||'未回答';
+  const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline||'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}`;
+  return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''}" data-event="${esc(l.id)}">
+    <div class="event-overview"><div class="event-dateline"><time class="date" datetime="${esc(l.date)}" title="${esc(l.date)}">${esc(eventDateLabel(l.date))}</time>${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}</div>
+    <h2>${esc(l.title)}</h2><p class="muted event-venue">${esc(l.venue||'会場未登録')}</p>${groupTags(l)}
+    <p class="my-attendance">自分の予定 <strong>${esc(mine)}</strong></p></div>
+    <div class="event-facts">${extra}</div>
+    <div class="event-actions"><button data-live="${esc(l.id)}" aria-label="${esc(l.title)}の詳細を見る">詳細を見る</button><button class="register-ticket" data-register="${esc(l.id)}" aria-label="${esc(l.title)}の番号を登録">＋ 番号登録</button></div>
+    ${attendanceDropdown(l)}
+    ${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}" aria-label="${esc(l.title)}を編集">イベント編集</button>`:''}
+  </article>`;
+}
 function render(){if(!data)return;const today=japanDay();lastDay=today;const lives=sortedEvents(data.lives.filter(l=>l.date>=today),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
 $('account').innerHTML=`<span class="account-name">${esc(data.me.name)}</span><button id="logout">名前を変更</button>`;$('logout').onclick=()=>{if(busy)return;if(outbox.length){notice('保存の保留を解決してから名前を変更してください');return}confirmedData=null;rememberMember('');notice('');chooseMemberScreen()};
-$('app').innerHTML=`${syncPanel()}<div class="top"><div><h1 style="margin-top:6px">${selected?'イベント詳細':'イベント一覧'}</h1></div><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>${selected?'<button class="back" id="back">← イベント一覧に戻る</button><section id="detail" class="detail-page"></section>':`<label for="search">イベントを探す</label><input id="search" class="search" placeholder="イベント名・会場・グループ" value="${esc(searchQuery)}"><label for="group-filter">出演グループで絞り込み</label><select id="group-filter"><option value="">すべてのグループ</option>${groups.map(g=>`<option value="${esc(g)}" ${g===groupFilter?'selected':''}>${esc(g)}</option>`).join('')}</select><div class="view-switch" role="group" aria-label="表示方法"><button data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button data-view="tiles" aria-pressed="${viewMode==='tiles'}">タイル</button></div><div class="event-grid ${viewMode==='list'?'event-list':''}" id="lives"></div><p id="empty-events" class="empty" hidden></p>`}<p class="foot">最終読込 ${cachedView?'前回の表示（未更新） · ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}（日本時間）</p>`;
-$('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();if(selected){$('back').onclick=returnHome;detail()}else{drawTiles(lives,today);$('group-filter').onchange=e=>{groupFilter=e.target.value;drawTiles(lives,today)};$('search').oninput=e=>{searchQuery=e.target.value;drawTiles(lives,today)};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{viewMode=b.dataset.view;try{localStorage.setItem('ticket-view-mode',viewMode)}catch(e){}render()})}showRefreshState();bindSyncPanel()}
-function drawTiles(lives,today){const q=searchQuery.toLowerCase();const visible=lives.filter(l=>(!groupFilter||(l.groups||[]).includes(groupFilter))&&(l.title+' '+l.venue+' '+(l.groups||[]).join(' ')).toLowerCase().includes(q));$('lives').innerHTML=visible.map(l=>eventTile(l,data.tickets,today)).join('');$('empty-events').hidden=visible.length>0;$('empty-events').textContent=lives.length?'該当するイベントはありません。':'「＋ イベント登録」からイベントを登録してください。';document.querySelectorAll('[data-live]').forEach(b=>b.onclick=()=>openEvent(b.dataset.live));document.querySelectorAll('[data-edit-live]').forEach(b=>b.onclick=()=>liveForm(data.lives.find(l=>l.id===b.dataset.editLive)))}
+$('app').innerHTML=`${syncPanel()}<div class="top"><div><h1 style="margin-top:6px">${selected?'イベント詳細':'イベント一覧'}</h1></div><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>${selected?'<button class="back" id="back">← イベント一覧に戻る</button><section id="detail" class="detail-page"></section>':`<div class="home-filters"><div><label for="search">イベントを探す</label><input id="search" type="search" class="search" placeholder="イベント名・会場・グループ" value="${esc(searchQuery)}"></div><div><label for="group-filter">出演グループ</label><select id="group-filter"><option value="">すべてのグループ</option>${groups.map(g=>`<option value="${esc(g)}" ${g===groupFilter?'selected':''}>${esc(g)}</option>`).join('')}</select></div></div><div class="results-toolbar"><div class="results-info"><span id="event-count" role="status" aria-live="polite"></span><button id="clear-filters" hidden>絞り込み解除</button></div><div class="view-switch" role="group" aria-label="表示方法"><button data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button data-view="tiles" aria-pressed="${viewMode==='tiles'}">タイル</button></div></div><div class="event-grid ${viewMode==='list'?'event-list':''}" id="lives"></div><p id="empty-events" class="empty" hidden></p>`}<p class="foot">最終読込 ${cachedView?'前回の表示（未更新） · ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}（日本時間）</p>`;
+$('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();if(selected){$('back').onclick=returnHome;detail()}else{drawTiles(lives,today);$('clear-filters').onclick=()=>{searchQuery='';groupFilter='';$('search').value='';$('group-filter').value='';drawTiles(lives,today)};$('group-filter').onchange=e=>{groupFilter=e.target.value;drawTiles(lives,today)};$('search').oninput=e=>{searchQuery=e.target.value;drawTiles(lives,today)};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{viewMode=b.dataset.view;try{localStorage.setItem('ticket-view-mode',viewMode)}catch(e){}render()})}showRefreshState();bindSyncPanel()}
+function drawTiles(lives,today){const q=searchQuery.trim().normalize('NFKC').toLowerCase();const visible=lives.filter(l=>(!groupFilter||(l.groups||[]).includes(groupFilter))&&(l.title+' '+l.venue+' '+(l.groups||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q));if($('event-count'))$('event-count').textContent=visible.length+'件'+(q||groupFilter?' / 全'+lives.length+'件':'のイベント');if($('clear-filters'))$('clear-filters').hidden=!(q||groupFilter);$('lives').innerHTML=visible.map(l=>eventTile(l,data.tickets,today)).join('');$('empty-events').hidden=visible.length>0;$('empty-events').textContent=lives.length?'該当するイベントはありません。':'「＋ イベント登録」からイベントを登録してください。';document.querySelectorAll('[data-register]').forEach(b=>b.onclick=()=>{if(busy)return;openEvent(b.dataset.register);addForm()});document.querySelectorAll('[data-live]').forEach(b=>b.onclick=()=>openEvent(b.dataset.live));document.querySelectorAll('[data-edit-live]').forEach(b=>b.onclick=()=>liveForm(data.lives.find(l=>l.id===b.dataset.editLive)))}
 
 function canEditLive(l){return l.owner===data.me.id||!data.members.some(m=>m.id===l.owner)}
 function detail(){const l=data.lives.find(l=>l.id===selected);if(!l){$('detail').innerHTML='<div class="card empty">まだイベントがありません。<br>「＋ イベント登録」から始めましょう。</div>';return}const tickets=data.tickets.filter(t=>t.liveId===l.id);const a=data.attendance.filter(a=>a.liveId===l.id);const mine=a.find(a=>a.memberId===data.me.id);const name=id=>data.members.find(m=>m.id===id)?.name||'退会メンバー';
