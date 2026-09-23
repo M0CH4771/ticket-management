@@ -203,6 +203,10 @@ dialog::backdrop{background:#20282080}
 .event-list .tile-attendance .attendance-surplus{grid-column:3 / 5}
 }
 .event-tile .event-actions{grid-template-columns:1fr}.my-attendance label{display:block;margin:10px 0 5px;font-size:12px}.my-attendance select{width:100%;max-width:220px;margin:0;min-height:44px}.manager-add{width:100%;margin:8px 0 18px}.manager-tickets .ticket{display:grid;grid-template-columns:minmax(45px,1fr) minmax(80px,2fr) auto;gap:10px}.manager-tickets .num{overflow-wrap:anywhere;min-width:0;font-size:20px}.manager-tickets .ticket-body{min-width:0;overflow-wrap:anywhere}.manager-sync{padding:12px;background:#fff0df;color:#8c3c00}.event-memo{margin-top:10px;font-size:13px}.event-memo p{overflow-wrap:anywhere}.modal-actions:has(#submit-save[hidden]){grid-template-columns:1fr}
+/* Save feedback is outside document flow, so its appearance never shifts cards. */
+.sync-panel{position:fixed;right:16px;bottom:max(76px,calc(env(safe-area-inset-bottom) + 64px));z-index:15;width:min(340px,calc(100vw - 32px));max-height:45dvh;overflow:auto;margin:0;padding:0 14px;box-shadow:0 3px 14px #17191d18}
+.sync-panel>summary{padding:10px 0;min-height:44px}.sync-panel>p{margin-bottom:12px}
+html{scrollbar-gutter:stable}
 </style></head><body><header><div class="brand">Ticket Management</div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=832f55ba"></script>
 <script src="./transport.js"></script>
@@ -252,7 +256,7 @@ function applySaveResult(current,result){
   if(result.changes.Lives)next.groups=[...new Set(next.lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));
   return next;
 }
-async function legacySave(action,p){if(busy)return;busy=true;++refreshVersion;loading=false;showRefreshState();const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(el=>!el.disabled);controls.forEach(el=>el.disabled=true);notice('保存中…');try{data=applySaveResult(data,await rpc('saveData',memberId,action,p,{response:'patch-v1'}));cacheSnapshot();modalDirty=false;$('modal').close();render();notice('保存しました')}catch(e){if(action==='attendance')render();notice(e.message)}finally{busy=false;controls.forEach(el=>el.disabled=false);if(managerLiveId&&!$('modal').open)ticketManager(managerLiveId)}}
+async function legacySave(action,p){if(busy)return;busy=true;++refreshVersion;loading=false;showRefreshState();const controls=[...document.querySelectorAll('button,input,select,textarea')].filter(el=>!el.disabled);controls.forEach(el=>el.disabled=true);notice('保存中…');try{data=applySaveResult(data,await rpc('saveData',memberId,action,p,{response:'patch-v1'}));cacheSnapshot();modalDirty=false;$('modal').close();updateSaveView(action);notice('保存しました')}catch(e){if(action==='attendance')updateSaveView(action);notice(e.message)}finally{busy=false;controls.forEach(el=>el.disabled=false);if(managerLiveId&&!$('modal').open)ticketManager(managerLiveId)}}
 let confirmedData=null,outbox=[],sending=false,recoveringOutbox=false,queueLease=null;
 async function acquireQueueLease(){
   if(queueLease)return true;
@@ -288,7 +292,7 @@ function optimisticPatch(base,item){
 }
 function rebuildOptimistic(){data=outbox.filter(item=>item.state!=='error').reduce((current,item)=>applySaveResult(current,optimisticPatch(current,item)),confirmedData)}
 function pendingDescription(item){const p=item.payload;if(item.action==='live')return 'イベント：'+p.title;if(item.action==='attendance')return '参戦予定：'+p.status;if(item.action==='addTickets')return p.entries.map(e=>e.number+'（'+e.status+'）').join('、');return (p.number||'チケット')+(item.action==='deleteTicket'?'を削除':'：'+p.status)}
-function syncPanel(){return outbox.length?`<section class="sync-panel" aria-label="保存状況"><strong>この端末の保存状況</strong>${outbox.map(item=>`<div class="sync-item"><span>${esc(pendingDescription(item))}</span><b>${item.state==='error'?'保存未確認':item.state==='sending'?'保存中…':'送信待ち'}</b>${item.error?`<p>${esc(item.error.replace('SAVE_UNCERTAIN: ',''))}</p>`:''}${item.state==='error'?`<div class="actions">${item.error?.includes('SAVE_UNCERTAIN')?'':`<button data-retry-save="${esc(item.id)}">再送</button>`}<button data-discard-save="${esc(item.id)}">保留を解除</button></div>`:''}</div>`).join('')}<p>「保存しました」と表示されるまでは、他の人への反映は未確認です。</p></section>`:''}
+function syncPanel(){return outbox.length?`<details class="sync-panel" aria-label="保存状況" ${outbox.some(i=>i.state==='error')?'open':''}><summary><span role="status">${outbox.some(i=>i.state==='error')?'保存未確認':'保存中…'} ${outbox.length}件</span></summary>${outbox.map(item=>`<div class="sync-item"><span>${esc(pendingDescription(item))}</span><b>${item.state==='error'?'保存未確認':item.state==='sending'?'保存中…':'送信待ち'}</b>${item.error?`<p>${esc(item.error.replace('SAVE_UNCERTAIN: ',''))}</p>`:''}${item.state==='error'?`<div class="actions">${item.error?.includes('SAVE_UNCERTAIN')?'':`<button data-retry-save="${esc(item.id)}">再送</button>`}<button data-discard-save="${esc(item.id)}">保留を解除</button></div>`:''}</div>`).join('')}<p>「保存しました」と表示されるまでは、他の人への反映は未確認です。</p></details>`:''}
 function bindSyncPanel(){
   document.querySelectorAll('[data-retry-save]').forEach(b=>b.onclick=()=>{const item=outbox.find(i=>i.id===b.dataset.retrySave);if(!item||sending)return;item.state='queued';item.error='';try{persistOutbox()}catch(e){notice('端末に保存できません。空き容量を確認してください');return}rebuildOptimistic();render();processOutbox()});
   document.querySelectorAll('[data-discard-save]').forEach(b=>b.onclick=()=>{if(sending)return;if(!confirm('入力の保留を解除します。既にスプシに保存された変更は取り消されません。再読込で確認してください。'))return;outbox=outbox.filter(i=>i.id!==b.dataset.discardSave);try{persistOutbox()}catch(e){notice('保留の更新に失敗しました');return}rebuildOptimistic();render();if(outbox.length)processOutbox();else {releaseQueueLease();refresh()}});
@@ -300,13 +304,13 @@ async function processOutbox(){
   sending=true;const item=outbox[0],owner=memberId;
   ++refreshVersion;loading=false;item.state='sending';
   try{
-    persistOutbox();if(!$('modal').open)render();
+    persistOutbox();if(!$('modal').open)updateSaveView(item.action);
     const result=await rpc('saveData',owner,item.action,item.payload,{response:'patch-v1',requestId:item.id});
     confirmedData=applySaveResult(confirmedData,result);
     outbox.shift();
     try{persistOutbox()}catch(e){notice('保存は完了しましたが端末の保留情報を更新できません。再読込時に保存結果を再確認します。')}
-    rebuildOptimistic();cacheSnapshot();if(!$('modal').open)render();else refreshTicketManager();notice('保存しました');
-  }catch(e){item.state='error';item.error=e.message;try{persistOutbox()}catch(_){}rebuildOptimistic();if(!$('modal').open)render();else refreshTicketManager();notice('保存を確認できません。保存状況から再送・確認できます。');}
+    rebuildOptimistic();cacheSnapshot();if(!$('modal').open)updateSaveView(item.action);else refreshTicketManager();notice('保存しました');
+  }catch(e){item.state='error';item.error=e.message;try{persistOutbox()}catch(_){}rebuildOptimistic();if(!$('modal').open)updateSaveView(item.action);else refreshTicketManager();notice('保存を確認できません。保存状況から再送・確認できます。');}
   finally{sending=false;}
   if(!outbox.length)releaseQueueLease();
   if(outbox.length&&outbox[0].state!=='error')processOutbox();
@@ -328,7 +332,7 @@ async function save(action,p){
   const item={id:crypto.randomUUID(),key,action,payload:JSON.parse(JSON.stringify(p)),state:'queued'};
   outbox.push(item);
   try{persistOutbox()}catch(e){outbox.pop();if(!outbox.length)releaseQueueLease();notice('端末に入力を保管できないため送信していません。入力はこの画面に残っています。');return}
-  ++refreshVersion;loading=false;rebuildOptimistic();modalDirty=false;$('modal').close();render();if(managerLiveId)ticketManager(managerLiveId);notice('画面に反映しました。スプシへ保存中…');processOutbox();
+  ++refreshVersion;loading=false;rebuildOptimistic();modalDirty=false;$('modal').close();updateSaveView(action);if(managerLiveId)ticketManager(managerLiveId);notice('画面に反映しました。スプシへ保存中…');processOutbox();
 }
 
 function rememberMember(id){if(id!==memberId){++refreshVersion;loading=false;try{sessionStorage.removeItem('ticket-snapshot')}catch(e){}}memberId=id;try{if(id)localStorage.setItem('live-pocket-member',id);else localStorage.removeItem('live-pocket-member')}catch(e){}}
@@ -389,11 +393,32 @@ function eventTile(l,tickets,today){
     ${attendanceDropdown(l)}
   </article>`;
 }
-function render(){if(!data)return;const today=japanDay();lastDay=today;const lives=sortedEvents(data.lives.filter(l=>l.date>=today),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
+function render(){
+  const scrollY=window.scrollY,scrollX=window.scrollX||0;
+  const opened=[...document.querySelectorAll('[data-event] .tile-attendance[open]')].map(el=>el.closest('[data-event]').dataset.event);
+  const focusId=document.activeElement?.id;
+  renderHome();
+  document.querySelectorAll('[data-event]').forEach(card=>{if(opened.includes(card.dataset.event)){const details=card.querySelector('.tile-attendance');if(details)details.open=true}});
+  if(focusId)$(focusId)?.focus({preventScroll:true});
+  window.scrollTo({top:scrollY,left:scrollX,behavior:'instant'});
+}
+function updateSaveView(action){
+  if(action!=='attendance'||!$('lives')){render();return}
+  const host=$('sync-host');if(host){const expanded=host.querySelector('details')?.open;host.innerHTML=syncPanel();if(expanded&&host.querySelector('details'))host.querySelector('details').open=true;bindSyncPanel()}
+  document.querySelectorAll('[data-event]').forEach(card=>{
+    const id=card.dataset.event,live=data.lives.find(l=>l.id===id);if(!live)return;
+    const select=card.querySelector('[data-attendance]');
+    if(select)select.value=data.attendance.find(a=>a.liveId===id&&a.memberId===data.me.id)?.status||'';
+    const details=card.querySelector('.tile-attendance');
+    if(details){const template=document.createElement('template');template.innerHTML=attendanceDropdown(live);const fresh=template.content.firstElementChild;if(details.innerHTML!==fresh.innerHTML)details.innerHTML=fresh.innerHTML}
+  });
+  showRefreshState();
+}
+function renderHome(){if(!data)return;const today=japanDay();lastDay=today;const lives=sortedEvents(data.lives.filter(l=>l.date>=today),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
 $('account').innerHTML=`<span class="account-name">${esc(data.me.name)}</span><button id="logout">名前を変更</button>`;$('logout').onclick=()=>{if(busy)return;if(outbox.length){notice('保存の保留を解決してから名前を変更してください');return}confirmedData=null;rememberMember('');notice('');chooseMemberScreen()};
-$('app').innerHTML=`${syncPanel()}<div class="top"><div><h1 style="margin-top:6px">イベント一覧</h1></div><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>${`<div class="home-filters"><div><label for="search">イベントを探す</label><input id="search" type="search" class="search" placeholder="イベント名・会場・グループ" value="${esc(searchQuery)}"></div><div><label for="group-filter">出演グループ</label><select id="group-filter"><option value="">すべてのグループ</option>${groups.map(g=>`<option value="${esc(g)}" ${g===groupFilter?'selected':''}>${esc(g)}</option>`).join('')}</select></div></div><div class="results-toolbar"><div class="results-info"><span id="event-count" role="status" aria-live="polite"></span><button id="clear-filters" hidden>絞り込み解除</button></div><div class="view-switch" role="group" aria-label="表示方法"><button data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button data-view="tiles" aria-pressed="${viewMode==='tiles'}">タイル</button></div></div><div class="event-grid ${viewMode==='list'?'event-list':''}" id="lives"></div><p id="empty-events" class="empty" hidden></p>`}<p class="foot">最終読込 ${cachedView?'前回の表示（未更新） · ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}（日本時間）</p>`;
+$('app').innerHTML=`<div id="sync-host">${syncPanel()}</div><div class="top"><div><h1 style="margin-top:6px">イベント一覧</h1></div><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>${`<div class="home-filters"><div><label for="search">イベントを探す</label><input id="search" type="search" class="search" placeholder="イベント名・会場・グループ" value="${esc(searchQuery)}"></div><div><label for="group-filter">出演グループ</label><select id="group-filter"><option value="">すべてのグループ</option>${groups.map(g=>`<option value="${esc(g)}" ${g===groupFilter?'selected':''}>${esc(g)}</option>`).join('')}</select></div></div><div class="results-toolbar"><div class="results-info"><span id="event-count" role="status" aria-live="polite"></span><button id="clear-filters" hidden>絞り込み解除</button></div><div class="view-switch" role="group" aria-label="表示方法"><button data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button data-view="tiles" aria-pressed="${viewMode==='tiles'}">タイル</button></div></div><div class="event-grid ${viewMode==='list'?'event-list':''}" id="lives"></div><p id="empty-events" class="empty" hidden></p>`}<p class="foot">最終読込 ${cachedView?'前回の表示（未更新） · ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}（日本時間）</p>`;
 $('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();{drawTiles(lives,today);$('clear-filters').onclick=()=>{searchQuery='';groupFilter='';$('search').value='';$('group-filter').value='';drawTiles(lives,today)};$('group-filter').onchange=e=>{groupFilter=e.target.value;drawTiles(lives,today)};$('search').oninput=e=>{searchQuery=e.target.value;drawTiles(lives,today)};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{viewMode=b.dataset.view;try{localStorage.setItem('ticket-view-mode',viewMode)}catch(e){}render()})}showRefreshState();bindSyncPanel()}
-function drawTiles(lives,today){const q=searchQuery.trim().normalize('NFKC').toLowerCase();const visible=lives.filter(l=>(!groupFilter||(l.groups||[]).includes(groupFilter))&&(l.title+' '+l.venue+' '+(l.groups||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q));if($('event-count'))$('event-count').textContent=visible.length+'件'+(q||groupFilter?' / 全'+lives.length+'件':'のイベント');if($('clear-filters'))$('clear-filters').hidden=!(q||groupFilter);$('lives').innerHTML=visible.map(l=>eventTile(l,data.tickets,today)).join('');$('empty-events').hidden=visible.length>0;$('empty-events').textContent=lives.length?'該当するイベントはありません。':'「＋ イベント登録」からイベントを登録してください。';document.querySelectorAll('[data-register]').forEach(b=>b.onclick=()=>{if(busy)return;ticketManager(b.dataset.register)});document.querySelectorAll('[data-attendance]').forEach(el=>el.onchange=async()=>{const liveId=el.dataset.attendance;const mine=data.attendance.find(a=>a.liveId===liveId&&a.memberId===data.me.id);await save('attendance',{liveId,status:el.value,version:mine?.version});if(!$('modal').open)render()});document.querySelectorAll('[data-edit-live]').forEach(b=>b.onclick=()=>liveForm(data.lives.find(l=>l.id===b.dataset.editLive)))}
+function drawTiles(lives,today){const q=searchQuery.trim().normalize('NFKC').toLowerCase();const visible=lives.filter(l=>(!groupFilter||(l.groups||[]).includes(groupFilter))&&(l.title+' '+l.venue+' '+(l.groups||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q));if($('event-count'))$('event-count').textContent=visible.length+'件'+(q||groupFilter?' / 全'+lives.length+'件':'のイベント');if($('clear-filters'))$('clear-filters').hidden=!(q||groupFilter);$('lives').innerHTML=visible.map(l=>eventTile(l,data.tickets,today)).join('');$('empty-events').hidden=visible.length>0;$('empty-events').textContent=lives.length?'該当するイベントはありません。':'「＋ イベント登録」からイベントを登録してください。';document.querySelectorAll('[data-register]').forEach(b=>b.onclick=()=>{if(busy)return;ticketManager(b.dataset.register)});document.querySelectorAll('[data-attendance]').forEach(el=>el.onchange=async()=>{const liveId=el.dataset.attendance;const mine=data.attendance.find(a=>a.liveId===liveId&&a.memberId===data.me.id);await save('attendance',{liveId,status:el.value,version:mine?.version});if(!$('modal').open)updateSaveView('attendance')});document.querySelectorAll('[data-edit-live]').forEach(b=>b.onclick=()=>liveForm(data.lives.find(l=>l.id===b.dataset.editLive)))}
 
 function canEditLive(l){return l.owner===data.me.id||!data.members.some(m=>m.id===l.owner)}
 function ticketPending(t){return String(t.id).startsWith('pending-')||outbox.some(item=>item.payload.id===t.id)}
