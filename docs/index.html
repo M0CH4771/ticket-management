@@ -186,6 +186,22 @@ dialog::backdrop{background:#20282080}
 }
 @media(max-width:360px){.top .actions{width:100%}.home-filters{grid-template-columns:1fr;gap:0}}
 .event-tile .event-facts .edit-event{display:block;margin:4px 0 0;padding:5px 0;font-size:12px;min-height:44px;text-align:left;width:auto}.event-list .event-facts .edit-event{margin-left:16px}@media(max-width:620px){.event-list .event-facts .edit-event{margin-left:10px}}
+
+/* Each member's own tickets and surplus remain separately labelled. */
+.attendance-personal{color:#174ea6;min-width:0;font-variant-numeric:tabular-nums}
+.tile-attendance .attendance-name{grid-column:1;font-weight:600}
+.tile-attendance .attendance-status{grid-column:2;text-align:right}
+.tile-attendance .attendance-personal,.tile-attendance .attendance-surplus{grid-column:1 / -1;text-align:left}
+.event-list .tile-attendance li{grid-template-columns:minmax(0,1fr) 4em minmax(0,1fr) minmax(0,1fr);gap:6px 12px;align-items:start}
+.event-list .tile-attendance .attendance-name{grid-column:1}
+.event-list .tile-attendance .attendance-personal{grid-column:3}
+.event-list .tile-attendance .attendance-surplus{grid-column:4}
+@media(max-width:620px){
+.event-list .tile-attendance .attendance-name{grid-column:1 / 3}
+.event-list .tile-attendance .attendance-status{grid-column:3 / 5}
+.event-list .tile-attendance .attendance-personal{grid-column:1 / 3}
+.event-list .tile-attendance .attendance-surplus{grid-column:3 / 5}
+}
 </style></head><body><header><div class="brand">Ticket Management</div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=832f55ba"></script>
 <script src="./transport.js"></script>
@@ -337,9 +353,19 @@ function handleHistory(){if(busy||($('modal').open&&modalDirty&&!confirm('入力
 function attendanceDropdown(l){
   const entries=new Map((data.attendance||[]).filter(a=>a.liveId===l.id).map(a=>[a.memberId,a.status]));
   const attending=data.members.filter(m=>entries.get(m.id)==='参戦').length;
-  const surplus=new Map();
-  for(const ticket of data.tickets||[])if(ticket.liveId===l.id&&ticket.status==='余り'){if(!surplus.has(ticket.memberId))surplus.set(ticket.memberId,[]);surplus.get(ticket.memberId).push(String(ticket.number||''));}
-  return `<details class="tile-attendance"><summary>みんなの参戦予定 <span>${attending}人参戦</span></summary><ul>${data.members.map(m=>`<li><span class="attendance-name">${esc(m.name)}</span><strong class="attendance-status">${esc(entries.get(m.id)||'未回答')}</strong><span class="attendance-surplus">余り${(surplus.get(m.id)||[]).length}枚${surplus.get(m.id)?.length?`<span class="attendance-numbers" aria-label="余りの整理番号">${[...surplus.get(m.id)].sort((a,b)=>a.localeCompare(b,'ja',{numeric:true})).map(n=>esc(n||'番号未入力')).join('、')}</span>`:''}</span></li>`).join('')||'<li>メンバー未登録</li>'}</ul></details>`;
+  const surplus=new Map(),personal=new Map();
+  for(const ticket of data.tickets||[]){
+    if(ticket.liveId!==l.id)continue;
+    const target=ticket.status==='余り'?surplus:ticket.status==='自分用'?personal:null;
+    if(!target)continue;
+    if(!target.has(ticket.memberId))target.set(ticket.memberId,[]);
+    target.get(ticket.memberId).push(String(ticket.number||''));
+  }
+  const numbers=(map,id,label)=>{
+    const values=map.get(id)||[];
+    return values.length?`<span class="attendance-numbers" aria-label="${label}の整理番号">${[...values].sort((a,b)=>a.localeCompare(b,'ja',{numeric:true})).map(n=>esc(n||'番号未入力')).join('、')}</span>`:'';
+  };
+  return `<details class="tile-attendance"><summary>みんなの参戦予定 <span>${attending}人参戦</span></summary><ul>${data.members.map(m=>`<li><span class="attendance-name">${esc(m.name)}</span><strong class="attendance-status">${esc(entries.get(m.id)||'未回答')}</strong><span class="attendance-personal">自分用${(personal.get(m.id)||[]).length}枚${numbers(personal,m.id,'自分用')}</span><span class="attendance-surplus">余り${(surplus.get(m.id)||[]).length}枚${numbers(surplus,m.id,'余り')}</span></li>`).join('')||'<li>メンバー未登録</li>'}</ul></details>`;
 }
 function japanDay(now=new Date()){return now.toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'})}
 function nextDay(day){return new Date(Date.parse(day+'T00:00:00Z')+86400000).toISOString().slice(0,10)}
