@@ -185,6 +185,7 @@ dialog::backdrop{background:#20282080}
   .event-tile .tile-attendance summary{font-size:12px}
 }
 @media(max-width:360px){.top .actions{width:100%}.home-filters{grid-template-columns:1fr;gap:0}}
+.event-tile .event-facts .edit-event{display:block;margin:4px 0 0;padding:5px 0;font-size:12px;min-height:44px;text-align:left;width:auto}.event-list .event-facts .edit-event{margin-left:16px}@media(max-width:620px){.event-list .event-facts .edit-event{margin-left:10px}}
 </style></head><body><header><div class="brand">Ticket Management</div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=832f55ba"></script>
 <script src="./transport.js"></script>
@@ -356,10 +357,9 @@ function eventTile(l,tickets,today){
     <div class="event-overview"><div class="event-dateline"><time class="date" datetime="${esc(l.date)}" title="${esc(l.date)}">${esc(eventDateLabel(l.date))}</time>${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}</div>
     <h2>${esc(l.title)}</h2><p class="muted event-venue">${esc(l.venue||'会場未登録')}</p>${groupTags(l)}
     <p class="my-attendance">自分の予定 <strong>${esc(mine)}</strong></p></div>
-    <div class="event-facts">${extra}</div>
+    <div class="event-facts">${extra}${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}" aria-label="${esc(l.title)}を編集">イベント編集</button>`:''}</div>
     <div class="event-actions"><button data-live="${esc(l.id)}" aria-label="${esc(l.title)}の詳細を見る">詳細を見る</button><button class="register-ticket" data-register="${esc(l.id)}" aria-label="${esc(l.title)}の番号を登録">＋ 番号登録</button></div>
     ${attendanceDropdown(l)}
-    ${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}" aria-label="${esc(l.title)}を編集">イベント編集</button>`:''}
   </article>`;
 }
 function render(){if(!data)return;const today=japanDay();lastDay=today;const lives=sortedEvents(data.lives.filter(l=>l.date>=today),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
