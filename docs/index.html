@@ -55,8 +55,10 @@
 
 .tile-attendance li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 6px}
 .tile-attendance .attendance-name{grid-column:1 / -1;min-width:0}
-.attendance-surplus{color:#15633f;font-variant-numeric:tabular-nums}
-.event-list .tile-attendance li{grid-template-columns:minmax(0,1fr) 4em minmax(4.5em,auto);align-items:baseline}
+.attendance-surplus{color:#15633f;font-variant-numeric:tabular-nums;min-width:0}
+.attendance-numbers{display:block;margin-top:4px;line-height:1.6;overflow-wrap:anywhere;font-size:12px}
+.tile-attendance li{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.event-list .tile-attendance li{grid-template-columns:minmax(0,1fr) 4em minmax(4.5em,1fr);align-items:baseline}
 .event-list .tile-attendance .attendance-name{grid-column:auto}
 .event-list .attendance-surplus{text-align:right}
 
@@ -221,8 +223,8 @@ function attendanceDropdown(l){
   const entries=new Map((data.attendance||[]).filter(a=>a.liveId===l.id).map(a=>[a.memberId,a.status]));
   const attending=data.members.filter(m=>entries.get(m.id)==='参戦').length;
   const surplus=new Map();
-  for(const ticket of data.tickets||[])if(ticket.liveId===l.id&&ticket.status==='余り')surplus.set(ticket.memberId,(surplus.get(ticket.memberId)||0)+1);
-  return `<details class="tile-attendance"><summary>みんなの参戦予定 <span>${attending}人参戦</span></summary><ul>${data.members.map(m=>`<li><span class="attendance-name">${esc(m.name)}</span><strong class="attendance-status">${esc(entries.get(m.id)||'未回答')}</strong><span class="attendance-surplus">余り${surplus.get(m.id)||0}枚</span></li>`).join('')||'<li>メンバー未登録</li>'}</ul></details>`;
+  for(const ticket of data.tickets||[])if(ticket.liveId===l.id&&ticket.status==='余り'){if(!surplus.has(ticket.memberId))surplus.set(ticket.memberId,[]);surplus.get(ticket.memberId).push(String(ticket.number||''));}
+  return `<details class="tile-attendance"><summary>みんなの参戦予定 <span>${attending}人参戦</span></summary><ul>${data.members.map(m=>`<li><span class="attendance-name">${esc(m.name)}</span><strong class="attendance-status">${esc(entries.get(m.id)||'未回答')}</strong><span class="attendance-surplus">余り${(surplus.get(m.id)||[]).length}枚${surplus.get(m.id)?.length?`<span class="attendance-numbers" aria-label="余りの整理番号">${[...surplus.get(m.id)].sort((a,b)=>a.localeCompare(b,\'ja\',{numeric:true})).map(n=>esc(n||\'番号未入力\')).join(\'、\')}</span>`:\'\'}</span></li>`).join('')||'<li>メンバー未登録</li>'}</ul></details>`;
 }
 function japanDay(now=new Date()){return now.toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'})}
 function nextDay(day){return new Date(Date.parse(day+'T00:00:00Z')+86400000).toISOString().slice(0,10)}
