@@ -314,6 +314,22 @@ html{scrollbar-gutter:stable}
   .event-tile .my-attendance label{font-size:11px}
   .event-tile .my-attendance select{width:min(100%,140px);max-width:140px;min-width:108px;padding:6px 22px 6px 7px;font-size:12px}
 }
+
+/* Keep attendance roster, headcount and surplus copy on one line in list view. */
+.event-footer{grid-column:1 / -1;display:flex;align-items:center;gap:8px;min-width:0;border-top:1px solid #e1e4e9}
+.event-footer .tile-attendance{flex:1 1 auto;min-width:0;border:0}
+.event-footer .tile-attendance summary{min-height:44px;padding:4px 0}
+.event-footer .tile-attendance summary span{display:inline-flex;align-items:center;min-height:24px;margin:0;padding:2px 6px;white-space:nowrap}
+.event-footer .copy-surplus,.event-list .event-tile .event-footer .copy-surplus{flex:0 0 auto;justify-self:auto;min-height:36px;white-space:nowrap;padding:4px 6px}
+@media(max-width:620px){
+ .event-list .event-footer{gap:4px}
+ .event-list .event-footer .tile-attendance summary{gap:4px;font-size:12px}
+ .event-list .event-footer .tile-attendance summary span{font-size:11px;padding:2px 5px}
+ .event-list .event-footer .copy-surplus{font-size:11px}
+ .event-grid:not(.event-list) .event-footer{flex-wrap:wrap;gap:2px 6px}
+ .event-grid:not(.event-list) .event-footer .tile-attendance{flex-basis:100%}
+ .event-grid:not(.event-list) .event-footer .copy-surplus{margin-left:auto}
+}
 </style></head><body><header><div class="brand">Ticket Management</div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=832f55ba"></script>
 <script src="./transport.js"></script>
@@ -535,7 +551,7 @@ function eventTile(l,tickets,today){
     <div class="my-attendance"><label for="attendance-${esc(l.id)}">自分の参戦予定</label><select id="attendance-${esc(l.id)}" data-attendance="${esc(l.id)}"><option value="" disabled ${mine==='未回答'?'selected':''}>未回答</option>${opts(['参戦','未定','不参加'],mine)}</select></div>${l.memo?`<div class="event-memo"><span class="muted">メモ</span><p class="note">${esc(l.memo)}</p></div>`:''}</div>
     <div class="event-facts">${extra}${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}" aria-label="${esc(l.title)}を編集">イベント編集</button>`:''}</div>
     <button class="my-ticket-summary" data-register="${esc(l.id)}" aria-label="${esc(l.title)}の番号を登録・編集"><span class="ticket-summary-values">${myTicketSummary(l.id)}</span><span class="ticket-summary-action">登録・編集 <span aria-hidden="true">›</span></span></button>
-    ${attendanceDropdown(l)}<button class="copy-surplus" data-copy-surplus="${esc(l.id)}">余り情報をコピー</button>
+    <div class="event-footer">${attendanceDropdown(l)}<button class="copy-surplus" data-copy-surplus="${esc(l.id)}">余り情報をコピー</button></div>
   </article>`;
 }
 function render(){
