@@ -304,6 +304,16 @@ html{scrollbar-gutter:stable}
  .event-grid:not(.event-list) .my-ticket-summary{flex-direction:column;align-items:stretch;gap:4px}
  .event-grid:not(.event-list) .ticket-summary-action{align-self:flex-end}
 }
+
+/* Compact the personal attendance control without shrinking its touch target. */
+.event-tile .my-attendance{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-top:5px}
+.event-tile .my-attendance label{display:inline-block;margin:0;font-size:12px;line-height:1.4}
+.event-tile .my-attendance select{width:min(100%,150px);max-width:150px;min-width:112px;min-height:44px;height:44px;margin:0;padding:6px 26px 6px 9px;font-size:13px;line-height:1.3}
+@media(max-width:620px){
+  .event-tile .my-attendance{gap:4px 6px;margin-top:4px}
+  .event-tile .my-attendance label{font-size:11px}
+  .event-tile .my-attendance select{width:min(100%,140px);max-width:140px;min-width:108px;padding:6px 22px 6px 7px;font-size:12px}
+}
 </style></head><body><header><div class="brand">Ticket Management</div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=832f55ba"></script>
 <script src="./transport.js"></script>
