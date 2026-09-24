@@ -228,6 +228,8 @@ html{scrollbar-gutter:stable}
   header #account{width:100%;gap:8px}
   #account .account-name{margin-right:auto;min-width:0;max-width:calc(100% - 190px)}
 }
+.event-grid .event-tile a.venue-map{display:inline-flex;align-items:center;justify-content:flex-start;gap:5px;min-height:36px;max-width:100%;padding:2px 0;border:0;border-radius:3px;background:transparent;color:#2b56c8;font-size:inherit;font-weight:400;line-height:1.5;text-align:left;text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
+.event-grid .event-tile a.venue-map:hover{color:#173c9d;background:#eef3ff}
 </style></head><body><header><div class="brand">Ticket Management</div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=832f55ba"></script>
 <script src="./transport.js"></script>
@@ -402,6 +404,7 @@ function nextDay(day){return new Date(Date.parse(day+'T00:00:00Z')+86400000).toI
 function previousDay(day){return new Date(Date.parse(day+'T00:00:00Z')-86400000).toISOString().slice(0,10)}
 function eventRank(l,today){if(l.lotteryDeadline===previousDay(today))return -1;if(l.date===today)return 0;if(l.lotteryDeadline===today)return 1;if(l.lotteryDeadline===nextDay(today))return 2;return 3}
 function sortedEvents(lives,today){return [...lives].sort((a,b)=>eventRank(a,today)-eventRank(b,today)||a.date.localeCompare(b.date)||a.title.localeCompare(b.title,'ja')||a.id.localeCompare(b.id))}
+function venueMapLink(value){const venue=String(value||'').trim();if(!venue)return '会場未登録';const url='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(venue);return `<a class="venue-map" href="${esc(url)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(venue)}をGoogleマップで検索（別画面で開く）" title="Googleマップで検索">${esc(venue)} <span aria-hidden="true">↗</span></a>`}
 function safeLink(url,label,sheet=false){const valid=sheet?/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url||''):/^https?:\/\/[a-zA-Z0-9.-]+(?::[0-9]+)?(?:[/?#][^\s<>]*)?$/.test(url||'');return valid?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`:`<p class="muted">${label}：未設定</p>`}
 
 function eventDateLabel(value){const d=new Date(value+'T12:00:00+09:00');return Number.isFinite(d.getTime())?d.toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',weekday:'short'}):value}
@@ -446,7 +449,7 @@ function eventTile(l,tickets,today){
   const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline||'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}`;
   return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''}" data-event="${esc(l.id)}">
     <div class="event-overview"><div class="event-dateline"><time class="date" datetime="${esc(l.date)}" title="${esc(l.date)}">${esc(eventDateLabel(l.date))}</time>${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}</div>
-    <h2>${esc(l.title)}</h2><p class="muted event-venue">${esc(l.venue||'会場未登録')}</p>${groupTags(l)}
+    <h2>${esc(l.title)}</h2><p class="muted event-venue">${venueMapLink(l.venue)}</p>${groupTags(l)}
     <div class="my-attendance"><label for="attendance-${esc(l.id)}">自分の参戦予定</label><select id="attendance-${esc(l.id)}" data-attendance="${esc(l.id)}"><option value="" disabled ${mine==='未回答'?'selected':''}>未回答</option>${opts(['参戦','未定','不参加'],mine)}</select></div>${l.memo?`<div class="event-memo"><span class="muted">メモ</span><p class="note">${esc(l.memo)}</p></div>`:''}</div>
     <div class="event-facts">${extra}${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}" aria-label="${esc(l.title)}を編集">イベント編集</button>`:''}<button class="duplicate-event" data-duplicate-live="${esc(l.id)}" aria-label="${esc(l.title)}を複製して登録">複製して登録</button></div>
     <button class="my-ticket-summary" data-register="${esc(l.id)}" aria-label="${esc(l.title)}の自分の番号を確認">${myTicketSummary(l.id)}</button>
