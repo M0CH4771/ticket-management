@@ -159,3 +159,16 @@ function testPushSubscription(id,secret) {
     return {accepted:true};
   } finally { lock.releaseLock(); }
 }
+
+// Visible editor entry point; web visitors cannot enable delivery.
+function enableNotifications() {
+  const active = Session.getActiveUser().getEmail();
+  const effective = Session.getEffectiveUser().getEmail();
+  if (!active || active !== effective) {
+    throw new Error('GASのエディタから管理者アカウントで実行してください');
+  }
+  if (typeof installPushNotifications_ !== 'function') {
+    throw new Error('Push.gsのコードが不足しています。全文を貼り直してください');
+  }
+  installPushNotifications_();
+}
