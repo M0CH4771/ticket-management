@@ -387,7 +387,8 @@ function attendanceDropdown(l){
 }
 function japanDay(now=new Date()){return now.toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'})}
 function nextDay(day){return new Date(Date.parse(day+'T00:00:00Z')+86400000).toISOString().slice(0,10)}
-function eventRank(l,today){if(l.date===today)return 0;if(l.lotteryDeadline===today)return 1;if(l.lotteryDeadline===nextDay(today))return 2;return 3}
+function previousDay(day){return new Date(Date.parse(day+'T00:00:00Z')-86400000).toISOString().slice(0,10)}
+function eventRank(l,today){if(l.lotteryDeadline===previousDay(today))return -1;if(l.date===today)return 0;if(l.lotteryDeadline===today)return 1;if(l.lotteryDeadline===nextDay(today))return 2;return 3}
 function sortedEvents(lives,today){return [...lives].sort((a,b)=>eventRank(a,today)-eventRank(b,today)||a.date.localeCompare(b.date)||a.title.localeCompare(b.title,'ja')||a.id.localeCompare(b.id))}
 function safeLink(url,label,sheet=false){const valid=sheet?/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url||''):/^https?:\/\/[a-zA-Z0-9.-]+(?::[0-9]+)?(?:[/?#][^\s<>]*)?$/.test(url||'');return valid?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`:`<p class="muted">${label}：未設定</p>`}
 
@@ -428,7 +429,7 @@ async function copySurplus(l){
 }
 function eventTile(l,tickets,today){
   const after=Boolean(l.lotteryDeadline)&&today>l.lotteryDeadline,rank=eventRank(l,today);
-  const labels=['本日開催','本日抽選締切','明日抽選締切'];
+  const labels={'-1':'昨日抽選締切',0:'本日開催',1:'本日抽選締切',2:'明日抽選締切'};
   const mine=(data.attendance||[]).find(a=>a.liveId===l.id&&a.memberId===data.me.id)?.status||'未回答';
   const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline||'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}`;
   return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''}" data-event="${esc(l.id)}">
