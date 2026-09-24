@@ -4,7 +4,7 @@
 (() => {
   const pending = new Map();
   let connection, dispose;
-  const methods = new Set(['getMembers', 'registerMember', 'getData', 'saveData']);
+  const methods = new Set(['getMembers', 'registerMember', 'getData', 'saveData', 'getPushSettings', 'savePushSubscription', 'removePushSubscription', 'testPushSubscription']);
   function validateEndpoint(value) {
     const url = new URL(value);
     if (url.origin !== 'https://script.google.com' || !/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url.pathname) || url.search || url.hash) throw new Error('GASの公開URL（末尾 /exec）を確認してください');
@@ -55,7 +55,7 @@
   }
   function call(method, ...args) {
     if (!methods.has(method)) return Promise.reject(new Error('未対応の操作です'));
-    const mutation = method === 'saveData' || method === 'registerMember';
+    const mutation = method === 'saveData' || method === 'registerMember' || method === 'savePushSubscription' || method === 'removePushSubscription' || method === 'testPushSubscription';
     return new Promise((resolve, reject) => {
       const id = crypto.randomUUID();
       let settled = false;

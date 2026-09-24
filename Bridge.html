@@ -3,7 +3,7 @@
 <script>
 const channel = <?!= JSON.stringify(channel) ?>;
 const parentOrigin = <?!= JSON.stringify(parentOrigin) ?>;
-const allowed = new Set(['getMembers','registerMember','getData','saveData']);
+const allowed = new Set(['getMembers','registerMember','getData','saveData','getPushSettings','savePushSubscription','removePushSubscription', 'testPushSubscription']);
 const seen = new Set();
 window.addEventListener('message', event => {
   const message = event.data;
