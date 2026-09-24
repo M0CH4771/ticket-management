@@ -19,9 +19,34 @@ function pushConfig_() {
     return {config,vapidKey};
   } catch(e) { return null; }
 }
-function getPushSettings() {
+function pushGroups_(value) {
+  if(value==null)return null; // Existing subscriptions continue receiving all groups.
+  if(!Array.isArray(value)||!value.length||value.length>100||value.some(g=>typeof g!=='string'||!g.trim()||g.length>100))
+    throw new Error('通知するグループを1つ以上選んでください');
+  return [...new Set(value.map(g=>g.trim()))];
+}
+function pushEventGroups_(live) {
+  if(Array.isArray(live.groups))return live.groups.filter(g=>typeof g==='string');
+  try {const groups=JSON.parse(live.groups||'[]');return Array.isArray(groups)?groups.filter(g=>typeof g==='string'):[];}catch(e){return [];}
+}
+function pushFilterEvents_(lives,groups) {
+  if(groups==null)return lives;
+  if(!Array.isArray(groups)||!groups.length)return [];
+  return lives.filter(l=>pushEventGroups_(l).some(g=>groups.includes(g)));
+}
+function getPushSettings(id,secret,includeGroups) {
   const config=pushConfig_();
-  return config&&pushProperties_().getProperty('PUSH_ENABLED')==='yes'?{ready:true,...config}:{ready:false};
+  const result=config&&pushProperties_().getProperty('PUSH_ENABLED')==='yes'?{ready:true,...config,groupFiltering:true}:{ready:false,groupFiltering:true};
+  if(includeGroups) {
+    resetRequest_();
+    result.availableGroups=[...new Set(rows_('Lives').flatMap(pushEventGroups_))].sort((a,b)=>a.localeCompare(b,'ja'));
+    if(id) {
+      const hash=pushIdentity_(id,secret),device=JSON.parse(pushProperties_().getProperty(PUSH_DEVICE_PREFIX_+id)||'null');
+      if(device&&device.hash!==hash)throw new Error('通知の登録情報が一致しません');
+      result.selectedGroups=device?.groups??null;
+    } else result.selectedGroups=null;
+  }
+  return result;
 }
 function pushIdentity_(id,secret) {
   if(!/^[a-f0-9-]{36}$/.test(id||'')||!/^[a-f0-9]{64}$/.test(secret||'')) throw new Error('通知の登録情報が無効です');
@@ -37,6 +62,7 @@ function savePushSubscription(memberId,device) {
     const p=pushProperties_(),key=PUSH_DEVICE_PREFIX_+device.id;
     const prior=JSON.parse(p.getProperty(key)||'null');
     if(prior&&prior.hash!==hash) throw new Error('通知の登録情報が一致しません');
+    const groups=Object.prototype.hasOwnProperty.call(device,'groups')?pushGroups_(device.groups):(prior?.groups??null);
     const entries=Object.entries(p.getProperties()).filter(([k])=>k.startsWith(PUSH_DEVICE_PREFIX_));
     if(!prior&&entries.length>=100) throw new Error('通知登録が上限です。管理者に連絡してください');
     // A cleared browser storage can reuse the same FCM token. Keep one active destination.
@@ -49,8 +75,8 @@ function savePushSubscription(memberId,device) {
       }
     }
     // Re-enabling the same device preserves today's delivery receipt.
-    p.setProperty(key,JSON.stringify({...prior,sentDay,hash,token:device.token,enabled:true,updatedAt:Date.now()}));
-    return {enabled:true};
+    p.setProperty(key,JSON.stringify({...prior,sentDay,hash,token:device.token,groups,enabled:true,updatedAt:Date.now()}));
+    return {enabled:true,groups,groupFiltering:true};
   } finally { lock.releaseLock(); }
 }
 function removePushSubscription(id,secret) {
@@ -113,19 +139,19 @@ function sendDeadlinePush_() {
     const p=pushProperties_(),config=pushConfig_();
     const lives=pushDueEvents_(rows_('Lives'),today);if(!lives.length)return;
     const entries=Object.entries(p.getProperties()).filter(([key])=>key.startsWith(PUSH_DEVICE_PREFIX_));
-    const due=entries.map(([key,value])=>({key,...JSON.parse(value)})).filter(d=>d.enabled&&d.token&&d.sentDay!==today&&!(d.attemptDay===today&&(d.attempts>=3||d.nextAttempt>Date.now()))).slice(0,10);
+    const due=entries.map(([key,value])=>({key,...JSON.parse(value)})).map(d=>({...d,events:pushFilterEvents_(lives,d.groups)})).filter(d=>d.enabled&&d.token&&d.events.length&&d.sentDay!==today&&!(d.attemptDay===today&&(d.attempts>=3||d.nextAttempt>Date.now()))).slice(0,10);
     if(!due.length)return;
     const access=pushAccessToken_();
     const ttl=Math.max(0,Math.floor((Date.parse(today+'T23:59:59+09:00')-Date.now())/1000));if(!ttl)return;
     for(const d of due) {
-      const {key,...record}=d;
+      const {key,events,...record}=d;
       record.attempts=d.attemptDay===today?(d.attempts||0)+1:1;
       record.attemptDay=today;record.nextAttempt=Date.now()+15*60000;
       p.setProperty(key,JSON.stringify(record)); // Reserve before sending; recover after transient failure.
       try {
         const response=UrlFetchApp.fetch('https://fcm.googleapis.com/v1/projects/'+encodeURIComponent(config.config.projectId)+'/messages:send',{
           method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+access},muteHttpExceptions:true,
-          payload:JSON.stringify({message:{token:d.token,data:{title:'本日抽選締切（'+lives.length+'件）',body:pushBody_(lives),tag:'ticket-deadline-'+today},webpush:{headers:{TTL:String(ttl),Urgency:'normal'}}}})
+          payload:JSON.stringify({message:{token:d.token,data:{title:'本日抽選締切（'+events.length+'件）',body:pushBody_(events),tag:'ticket-deadline-'+today},webpush:{headers:{TTL:String(ttl),Urgency:'normal'}}}})
         });
         const status=response.getResponseCode();
         if(status===200){record.sentDay=today;record.lastStatus='sent';}

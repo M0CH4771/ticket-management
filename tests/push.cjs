@@ -25,6 +25,31 @@ time=Date.parse('2026-09-25T12:00:00+09:00');lives[0].lotteryDeadline='2026-09-2
 assert.equal(c.pushDueEvents_([{id:'jan',title:'Jan',date:'2027-01-05',lotteryDeadline:'12/31'}],'2026-12-31').length,1);
 lives=[];time+=86400000;c.sendDeadlinePush_();assert.equal(sent.length,3);
 lives=[{id:'x',title:'x',date:'2026-12-01',lotteryDeadline:'2026-09-26'}];fetchStatus=404;c.sendDeadlinePush_();assert.equal(JSON.parse(p.getProperty('PUSH_DEVICE_'+device.id)).enabled,false);
+// Per-device group filtering: OR matching, never duplicate a multi-group event.
+for(const key of [...props.keys()])if(key.startsWith('PUSH_DEVICE_'))props.delete(key);
+sent=[];fetchStatus=200;time=Date.parse('2026-09-27T12:00:00+09:00');
+lives=[
+ {id:'both',title:'A and B live',date:'2026-10-01',lotteryDeadline:'2026-09-27',groups:'["A","B"]',requiredThrows:'3'},
+ {id:'other',title:'C only',date:'2026-10-02',lotteryDeadline:'2026-09-27',groups:'["C"]',requiredThrows:'2'},
+ {id:'untagged',title:'No tags',date:'2026-10-03',lotteryDeadline:'2026-09-27',groups:''}
+];
+assert.throws(()=>c.savePushSubscription('me',{...device,groups:[]}),/1つ以上/);
+c.savePushSubscription('me',{...device,groups:['A','B','A']});
+assert.equal(c.getPushSettings(device.id,device.secret,true).selectedGroups.join(','),'A,B');
+assert.throws(()=>c.getPushSettings(device.id,'b'.repeat(64),true),/一致/);
+c.savePushSubscription('me',device); // Old clients/token refresh omit groups; preserve server preference.
+assert.equal(c.getPushSettings(device.id,device.secret,true).selectedGroups.join(','),'A,B');
+c.sendDeadlinePush_();assert.equal(sent.length,1);assert.equal(sent[0].message.data.title,'本日抽選締切（1件）');
+assert.equal(sent[0].message.data.body.split('A and B live').length-1,1);assert(!sent[0].message.data.body.includes('C only'));
+c.sendDeadlinePush_();assert.equal(sent.length,1);
+// Nonmatching devices must not occupy the batch and starve other subscribers.
+for(let i=2;i<=12;i++)c.savePushSubscription('me',{id:'00000000-0000-0000-0000-'+String(i).padStart(12,'0'),secret:'a'.repeat(64),token:'token'+i,groups:['Absent']});
+const all={id:'00000000-0000-0000-0000-000000000013',secret:'a'.repeat(64),token:'all'};
+c.savePushSubscription('me',{...all,groups:null});c.sendDeadlinePush_();assert.equal(sent.length,2);assert.equal(sent[1].message.data.title,'本日抽選締切（3件）');
+assert(!JSON.parse(p.getProperty('PUSH_DEVICE_00000000-0000-0000-0000-000000000002')).sentDay);
+// Untagged/invalid group data never matches a selected group; all still includes it.
+assert.equal(c.pushFilterEvents_(lives,['Missing']).length,0);assert.equal(c.pushFilterEvents_(lives,null).length,3);
+console.log('PASS: per-device selections, same event with multiple selected groups once, all-groups mode, no-match skip, batch fairness, old-client preservation, credential checks');
 console.log('PASS: noon JST, no early/empty/past sends, date normalization, receipts, transient retry, opt-out ownership, expired tokens, public config excludes credentials');
 (async()=>{
  const handlers={},shown=[],opened=[];
