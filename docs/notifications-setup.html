@@ -7,7 +7,7 @@
   "projectId": "コピーした値",
   "messagingSenderId": "コピーした値",
   "appId": "コピーした値"
-}</code></pre><p>保存後、GASエディタ上部で <code>installPushNotifications_</code> を選んで実行し、Googleの権限を許可します。5分ごとのトリガーが1つ作成されます。</p><p><strong>デプロイ → デプロイを管理 → 編集 → 新バージョン</strong>で、現在のウェブアプリを更新します。既存のURLを維持し、実行ユーザーとアクセス設定も今のままにします。</p></section>
+}</code></pre><p>保存後、GASエディタ上部で <code>enableNotifications</code> を選んで実行し、Googleの権限を許可します。5分ごとのトリガーが1つ作成されます。</p><p><strong>デプロイ → デプロイを管理 → 編集 → 新バージョン</strong>で、現在のウェブアプリを更新します。既存のURLを維持し、実行ユーザーとアクセス設定も今のままにします。</p></section>
 <section><h2>3．スマホで通知をオンにする</h2><ol><li>iPhoneはSafariでサイトを開き、「共有」→「ホーム画面に追加」。iOS 16.4以降が必要です。</li><li>追加したアイコンから起動し、イベント一覧の下の「通知設定」を開きます。</li><li>「通知を受け取る」を押し、通知を許可します。</li><li>「テスト通知」を押して、実際に届くか確認します。画面を閉じた状態でも通知を確認してください。</li></ol><p>通知は端末ごとの設定です。名前の選択や参戦状況にかかわらず、その日が締切のイベントをまとめて知らせます。</p></section>
 <section><h2>通知の動作</h2><ul><li>日本時間の昼12時以降に、締切当日のイベントがある日だけ送信します。12時ちょうどの配信は保証されません。</li><li>端末ごとに、その日の送信成功を記録します。通信エラーは15分以上あけて最大3回試行します。同日の通知は同じタグで置き換えます。</li><li>当日分の通知を送った後にイベントを追加しても、その日の再送はしません。</li><li>期限切れの通知先は停止します。通知が届かなくなったら「通知の登録を更新」を押してください。</li><li>初期設定では100端末まで、1回の実行につき最大10端末へ送信します。多数の端末では順次配信になります。</li><li>無料のGAS利用上限に達した場合は遅延・停止することがあります。自動で有料プランに移行する構成ではありません。</li><li>全体の通知を止めるにはGASで <code>stopPushNotifications_</code> を実行します。各自は「通知をオフ」で停止できます。</li></ul></section>
 <p class="note">技術資料：<a href="https://firebase.google.com/docs/projects/billing/firebase-pricing-plans">Firebase料金プラン</a>／<a href="https://firebase.google.com/docs/cloud-messaging/web/get-started">Web通知の設定</a>／<a href="https://firebase.google.com/docs/cloud-messaging/send/v1-api">送信API</a></p><div id="status" role="status"></div><textarea id="fallback" hidden readonly aria-label="コピーするコード"></textarea></main>
