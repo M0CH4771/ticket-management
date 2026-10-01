@@ -45,8 +45,38 @@ function getPushSettings(id,secret,includeGroups) {
       if(device&&device.hash!==hash)throw new Error('通知の登録情報が一致しません');
       result.selectedGroups=device?.groups??null;
     } else result.selectedGroups=null;
+    result.lineNotification={
+      ready:lineConfig_().ready,
+      selectedGroups:lineNotificationGroups_(),
+      availableGroups:result.availableGroups
+    };
   }
   return result;
+}
+function lineConfig_() {
+  const p=pushProperties_();
+  const token=(p.getProperty('LINE_CHANNEL_ACCESS_TOKEN')||'').trim();
+  const groupId=(p.getProperty('LINE_GROUP_ID')||'').trim();
+  return {ready:p.getProperty('LINE_ENABLED')==='yes'&&token.length>0&&groupId.length>0,token,groupId};
+}
+function lineNotificationGroups_() {
+  const raw=pushProperties_().getProperty('LINE_NOTIFICATION_GROUPS');
+  if(!raw||raw==='*')return null;
+  try {const groups=JSON.parse(raw);return Array.isArray(groups)?groups:[];}catch(e){return [];}
+}
+function saveLineNotificationGroups(memberId,groups) {
+  resetRequest_();selectedMember_(memberId);
+  const available=[...new Set(rows_('Lives').flatMap(pushEventGroups_))];
+  if(groups===null) {
+    pushProperties_().setProperty('LINE_NOTIFICATION_GROUPS','*');
+    return {selectedGroups:null};
+  }
+  if(!Array.isArray(groups)||!groups.length||groups.length>100||groups.some(g=>typeof g!=='string'||!g.trim()||g.length>100))
+    throw new Error('通知する出演グループを1つ以上選んでください');
+  const selected=[...new Set(groups.map(g=>g.trim()))];
+  if(selected.some(g=>!available.includes(g)))throw new Error('出演グループの一覧が更新されています。画面を再読み込みしてください');
+  pushProperties_().setProperty('LINE_NOTIFICATION_GROUPS',JSON.stringify(selected));
+  return {selectedGroups:selected};
 }
 function pushIdentity_(id,secret) {
   if(!/^[a-f0-9-]{36}$/.test(id||'')||!/^[a-f0-9]{64}$/.test(secret||'')) throw new Error('通知の登録情報が無効です');
@@ -93,14 +123,37 @@ function installPushNotifications_() {
   if(!pushConfig_()) throw new Error('Firebase設定・公開VAPIDキー・サービスアカウントJSONを確認してください');
   if(!pushProperties_().getProperty('SHEET_ID')) throw new Error('既存の管理スプシが設定されていません');
   pushAccessToken_(); // Validate credentials before marking the service ready.
-  ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='sendDeadlinePush_').forEach(t=>ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('sendDeadlinePush_').timeBased().everyMinutes(5).create();
+  ensureDeadlineTrigger_();
   pushProperties_().setProperty('PUSH_ENABLED','yes');
   console.log('通知の準備ができました。サイトの「通知設定」から登録できます。');
 }
 function stopPushNotifications_() {
   pushProperties_().deleteProperty('PUSH_ENABLED');
+  if(!lineConfig_().ready)removeDeadlineTrigger_();
+}
+function ensureDeadlineTrigger_() {
+  const triggers=ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='sendDeadlinePush_');
+  triggers.slice(1).forEach(t=>ScriptApp.deleteTrigger(t));
+  if(!triggers.length)ScriptApp.newTrigger('sendDeadlinePush_').timeBased().everyMinutes(5).create();
+}
+function removeDeadlineTrigger_() {
   ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='sendDeadlinePush_').forEach(t=>ScriptApp.deleteTrigger(t));
+}
+// Run from the GAS editor after setting LINE_CHANNEL_ACCESS_TOKEN and LINE_GROUP_ID.
+function installLineNotifications_() {
+  const p=pushProperties_(),token=(p.getProperty('LINE_CHANNEL_ACCESS_TOKEN')||'').trim(),groupId=(p.getProperty('LINE_GROUP_ID')||'').trim();
+  if(!token||!groupId)throw new Error('LINE_CHANNEL_ACCESS_TOKENとLINE_GROUP_IDをスクリプトプロパティに設定してください');
+  if(!p.getProperty('SHEET_ID'))throw new Error('既存の管理スプシが設定されていません');
+  const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/group/'+encodeURIComponent(groupId)+'/summary',{method:'get',headers:{Authorization:'Bearer '+token},muteHttpExceptions:true});
+  if(response.getResponseCode()!==200)throw new Error('LINEへの接続を確認できませんでした。アクセストークン・グループID・Botがグループに参加しているかを確認してください');
+  p.setProperty('LINE_ENABLED','yes');
+  if(!p.getProperty('LINE_NOTIFICATION_GROUPS'))p.setProperty('LINE_NOTIFICATION_GROUPS','*');
+  ensureDeadlineTrigger_();
+  console.log('LINE締切通知を有効にしました。確認メッセージを送信しました。');
+}
+function stopLineNotifications_() {
+  pushProperties_().deleteProperty('LINE_ENABLED');
+  if(pushProperties_().getProperty('PUSH_ENABLED')!=='yes')removeDeadlineTrigger_();
 }
 function pushAccessToken_() {
   const p=pushProperties_(),service=JSON.parse(p.getProperty('PUSH_SERVICE_ACCOUNT')||'{}');
@@ -132,12 +185,25 @@ function pushBody_(lives) {
 }
 function sendDeadlinePush_() {
   const now=new Date(),today=Utilities.formatDate(now,'Asia/Tokyo','yyyy-MM-dd');
-  if(Number(Utilities.formatDate(now,'Asia/Tokyo','H'))<12||!getPushSettings().ready)return;
+  if(Number(Utilities.formatDate(now,'Asia/Tokyo','H'))<12||(!getPushSettings().ready&&!lineConfig_().ready))return;
   const lock=LockService.getUserLock();if(!lock.tryLock(1000))return;
   try {
     resetRequest_();
-    const p=pushProperties_(),config=pushConfig_();
+    const p=pushProperties_(),config=pushConfig_(),line=lineConfig_();
     const lives=pushDueEvents_(rows_('Lives'),today);if(!lives.length)return;
+    if(line.ready&&p.getProperty('LINE_SENT_DAY')!==today) {
+      const events=pushFilterEvents_(lives,lineNotificationGroups_());
+      const lineAttemptDay=p.getProperty('LINE_ATTEMPT_DAY')||'',lineAttempts=Number(p.getProperty('LINE_ATTEMPTS')||0),nextAttempt=Number(p.getProperty('LINE_NEXT_ATTEMPT')||0);
+      if(events.length&&!(lineAttemptDay===today&&(lineAttempts>=3||nextAttempt>Date.now()))) {
+        p.setProperty('LINE_ATTEMPT_DAY',today);p.setProperty('LINE_ATTEMPTS',String(lineAttemptDay===today?lineAttempts+1:1));p.setProperty('LINE_NEXT_ATTEMPT',String(Date.now()+15*60000));
+        try {
+          const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+line.token},muteHttpExceptions:true,payload:JSON.stringify({to:line.groupId,messages:[{type:'text',text:lineBody_(events,today)}]})});
+          if(response.getResponseCode()===200)p.setProperty('LINE_SENT_DAY',today);
+          else p.setProperty('LINE_LAST_STATUS','HTTP '+response.getResponseCode());
+        } catch(e) { p.setProperty('LINE_LAST_STATUS','network-error'); }
+      }
+    }
+    if(!config||p.getProperty('PUSH_ENABLED')!=='yes')return;
     const entries=Object.entries(p.getProperties()).filter(([key])=>key.startsWith(PUSH_DEVICE_PREFIX_));
     const due=entries.map(([key,value])=>({key,...JSON.parse(value)})).map(d=>({...d,events:pushFilterEvents_(lives,d.groups)})).filter(d=>d.enabled&&d.token&&d.events.length&&d.sentDay!==today&&!(d.attemptDay===today&&(d.attempts>=3||d.nextAttempt>Date.now()))).slice(0,10);
     if(!due.length)return;
@@ -167,6 +233,12 @@ function sendDeadlinePush_() {
     }
     p.setProperty('PUSH_LAST_RUN',now.toISOString());
   } finally { lock.releaseLock(); }
+}
+function lineBody_(events,today) {
+  const lines=['【抽選締切のお知らせ】',today+'締切のイベント'];
+  events.slice(0,8).forEach(l=>lines.push('・'+String(l.date||'').slice(5).replace('-','/')+' '+String(l.title).slice(0,80)+'（投げ数 '+(l.requiredThrows!==''&&l.requiredThrows!=null?l.requiredThrows+'枚':'未設定')+'）'));
+  if(events.length>8)lines.push('ほか'+(events.length-8)+'件');
+  return lines.join('\n');
 }
 // Explicit device-only test; never broadcasts and never exposes tokens.
 function testPushSubscription(id,secret) {
