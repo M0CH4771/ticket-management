@@ -1,11 +1,11 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict'),crypto=require('crypto');
 const source=fs.readFileSync(__dirname+'/../Push.gs','utf8');
 const code=fs.readFileSync(__dirname+'/../Code.gs','utf8');
-let time=Date.parse('2026-09-24T11:59:00+09:00'),sent=[],fetchStatus=200,lives=[];
+let time=Date.parse('2026-09-24T11:59:00+09:00'),sent=[],requests=[],fetchStatus=200,lives=[];
 const props=new Map(),cache=new Map();
 const p={getProperty:k=>props.get(k)||null,setProperty:(k,v)=>{props.set(k,v);return p},deleteProperty:k=>props.delete(k),getProperties:()=>Object.fromEntries(props)};
 const D=class extends Date{constructor(...args){super(...(args.length?args:[time]))}static now(){return time}};
-const c=vm.createContext({Date:D,console,PropertiesService:{getScriptProperties:()=>p},LockService:{getUserLock:()=>({waitLock(){},tryLock:()=>true,releaseLock(){}})},Utilities:{formatDate:(d,tz,format)=>format==='H'?new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',hourCycle:'h23'}).format(d):d.toLocaleDateString('sv-SE',{timeZone:tz}),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,v)=>crypto.createHash('sha256').update(v).digest(),base64EncodeWebSafe:v=>Buffer.from(v).toString('base64url')},CacheService:{getScriptCache:()=>({remove:k=>cache.delete(k)})},UrlFetchApp:{fetch:(url,options)=>{sent.push(JSON.parse(options.payload));return {getResponseCode:()=>fetchStatus,getContentText:()=>JSON.stringify(fetchStatus===404?{error:{details:[{errorCode:'UNREGISTERED'}]}}:{name:'sent'})}}},resetRequest_(){},selectedMember_:id=>{if(id!=='me')throw Error('invalid member')},rows_:()=>lives});
+const c=vm.createContext({Date:D,console,PropertiesService:{getScriptProperties:()=>p},LockService:{getUserLock:()=>({waitLock(){},tryLock:()=>true,releaseLock(){}})},Utilities:{formatDate:(d,tz,format)=>format==='H'?new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',hourCycle:'h23'}).format(d):d.toLocaleDateString('sv-SE',{timeZone:tz}),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,v)=>crypto.createHash('sha256').update(v).digest(),base64EncodeWebSafe:v=>Buffer.from(v).toString('base64url')},CacheService:{getScriptCache:()=>({remove:k=>cache.delete(k)})},UrlFetchApp:{fetch:(url,options)=>{requests.push({url,options});if(options.payload)sent.push(JSON.parse(options.payload));return {getResponseCode:()=>fetchStatus,getContentText:()=>JSON.stringify(fetchStatus===404?{error:{details:[{errorCode:'UNREGISTERED'}]}}:{name:'sent'})}}},resetRequest_(){},selectedMember_:id=>{if(id!=='me')throw Error('invalid member')},rows_:()=>lives});
 vm.runInContext(code.slice(code.indexOf('function normalizeDate_('),code.indexOf('function normalizeSheetDates_(')),c);
 vm.runInContext(source,c);c.pushAccessToken_=()=> 'test-token';
 assert.equal(c.getPushSettings().ready,false);
@@ -49,8 +49,27 @@ c.savePushSubscription('me',{...all,groups:null});c.sendDeadlinePush_();assert.e
 assert(!JSON.parse(p.getProperty('PUSH_DEVICE_00000000-0000-0000-0000-000000000002')).sentDay);
 // Untagged/invalid group data never matches a selected group; all still includes it.
 assert.equal(c.pushFilterEvents_(lives,['Missing']).length,0);assert.equal(c.pushFilterEvents_(lives,null).length,3);
+// LINE group filter is shared, secret-free in the browser response, and sends one group message per deadline day.
+for(const key of [...props.keys()])if(key.startsWith('PUSH_DEVICE_'))props.delete(key);
+p.deleteProperty('PUSH_ENABLED');p.setProperty('LINE_CHANNEL_ACCESS_TOKEN','secret-line-token');p.setProperty('LINE_GROUP_ID','C-group-id');p.setProperty('LINE_ENABLED','yes');
+const lineLives=[
+ {id:'line1',title:'LINE A and B live',date:'2026-10-10',lotteryDeadline:'2026-09-27',groups:'["A","B"]',requiredThrows:'3',purchaseUrl:'https://example.test/ticket-a'},
+ {id:'line2',title:'LINE B live',date:'2026-10-11',lotteryDeadline:'2026-09-27',groups:'["B"]',requiredThrows:'2',purchaseUrl:'https://example.test/ticket-b'},
+ {id:'line3',title:'LINE C live',date:'2026-10-12',lotteryDeadline:'2026-09-27',groups:'["C"]',requiredThrows:'1',purchaseUrl:'https://example.test/ticket-c'}
+];lives=lineLives;time=Date.parse('2026-09-27T12:05:00+09:00');
+assert.deepEqual(JSON.parse(JSON.stringify(c.getPushSettings(null,null,true).lineNotification)),{ready:true,selectedGroups:null,availableGroups:['A','B','C']});
+c.saveLineNotificationGroups('me',['A','B']);
+const publicSettings=JSON.stringify(c.getPushSettings(null,null,true));assert(!publicSettings.includes('secret-line-token'));assert(!publicSettings.includes('C-group-id'));
+const beforeLine=requests.length;c.sendDeadlinePush_();
+const lineRequest=requests.slice(beforeLine).find(r=>r.url==='https://api.line.me/v2/bot/message/push');assert(lineRequest);
+const lineText=JSON.parse(lineRequest.options.payload).messages[0].text;
+assert.match(lineText,/【本日締切】/);assert.match(lineText,/開催日：2026\/10\/10/);assert.match(lineText,/イベント名：LINE A and B live/);assert.match(lineText,/チケットURL：https:\/\/example\.test\/ticket-a/);assert.match(lineText,/枠数：3枚/);
+assert.match(lineText,/イベント名：LINE B live/);assert(!lineText.includes('LINE C live'));
+assert.equal(p.getProperty('LINE_SENT_DAY'),'2026-09-27');c.sendDeadlinePush_();assert.equal(requests.filter(r=>r.url==='https://api.line.me/v2/bot/message/push').length,1);
+assert.throws(()=>c.saveLineNotificationGroups('me',[]),/1つ以上/);assert.throws(()=>c.saveLineNotificationGroups('me',['Not an event group']),/一覧が更新/);
 console.log('PASS: per-device selections, same event with multiple selected groups once, all-groups mode, no-match skip, batch fairness, old-client preservation, credential checks');
 console.log('PASS: noon JST, no early/empty/past sends, date normalization, receipts, transient retry, opt-out ownership, expired tokens, public config excludes credentials');
+console.log('PASS: shared LINE group filter, one aggregated message per due day, selection validation, and no server secrets in public settings');
 (async()=>{
  const handlers={},shown=[],opened=[];
  const sw={self:{addEventListener:(k,f)=>handlers[k]=f,registration:{scope:'https://example.test/ticket-management/docs/',showNotification:(t,o)=>{shown.push({t,o});return Promise.resolve()}},clients:{claim:async()=>{},matchAll:async()=>[],openWindow:async url=>opened.push(url)},skipWaiting(){}},URL};
