@@ -1,5 +1,5 @@
 const storageKey='ticket-push-v1';
-let dialog,working=false,settings,clientPromise;
+let dialog,working=false,settings,clientPromise,memberIdForSave;
 const read=()=>{try{return JSON.parse(localStorage.getItem(storageKey)||'null')}catch{return null}};
 const write=value=>localStorage.setItem(storageKey,JSON.stringify(value));
 const rpc=(...args)=>window.LivePocketTransport.call(...args);
@@ -14,8 +14,15 @@ function selectedGroups(){
   if(!groups.length)throw new Error('通知するグループを1つ以上選んでください。');
   return groups;
 }
+function selectedLineGroups(){
+  const mode=dialog.querySelector('[data-line-mode]').value;
+  if(mode==='all')return null;
+  const groups=[...dialog.querySelectorAll('[data-line-group]:checked')].map(el=>el.value);
+  if(!groups.length)throw new Error('LINEに通知する出演グループを1つ以上選んでください。');
+  return groups;
+}
 function showGroups(){
-  const host=dialog.querySelector('[data-group-options]');host.replaceChildren();
+  const host=dialog.querySelector('[data-push-group-options]');host.replaceChildren();
   if(!settings?.groupFiltering) {
     host.textContent='グループの絞り込みには、管理者によるPush.gsの更新が必要です。';return;
   }
@@ -34,9 +41,41 @@ function showGroups(){
   const hint=document.createElement('p');hint.className='muted';hint.textContent='複数選択できます。同じイベントは、選んだグループが複数出演していても1回だけ掲載します。';
   mode.onchange=()=>{list.hidden=mode.value==='all'};mode.onchange();host.append(label,mode,list,hint);
 }
+function showLineGroups(){
+  const host=dialog.querySelector('[data-line-options]');host.replaceChildren();
+  const line=settings?.lineNotification||{ready:false,selectedGroups:null};
+  const state=document.createElement('p');state.className='muted';
+  state.textContent=line.ready?'LINEグループ通知：設定済み':'LINEグループ通知：管理者の初期設定中';
+  const label=document.createElement('label');label.htmlFor='line-group-mode';label.textContent='通知する出演グループ（全員共通）';
+  const mode=document.createElement('select');mode.id='line-group-mode';mode.dataset.lineMode='';
+  mode.innerHTML='<option value="all">すべてのグループ</option><option value="selected">グループを選ぶ</option>';
+  const selected=line.selectedGroups??null;mode.value=selected===null?'all':'selected';
+  const list=document.createElement('div');list.dataset.lineList='';list.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 8px;max-height:200px;overflow:auto;margin:8px 0';
+  const names=[...new Set(settings?.availableGroups||[])].sort((a,b)=>a.localeCompare(b,'ja'));
+  for(const name of names){
+    const item=document.createElement('label');item.style.cssText='display:flex;align-items:center;gap:8px;min-height:42px;margin:0;padding:4px;font-weight:400;overflow-wrap:anywhere';
+    const input=document.createElement('input');input.type='checkbox';input.dataset.lineGroup='';input.value=name;input.checked=!!selected?.includes(name);input.style.cssText='width:20px;height:20px;min-height:20px;flex:none;margin:0';
+    const text=document.createElement('span');text.textContent=name;item.append(input,text);list.append(item);
+  }
+  if(!names.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='イベントに出演グループを登録すると、ここに表示されます。';list.append(empty)}
+  const hint=document.createElement('p');hint.className='muted';hint.textContent='複数選択したグループに同じイベントが出演していても、LINEには1回だけ掲載します。';
+  const save=document.createElement('button');save.type='button';save.textContent='LINE通知の対象を保存';save.dataset.saveLineGroups='';
+  mode.onchange=()=>{list.hidden=mode.value==='all'};mode.onchange();
+  save.onclick=async()=>{
+    if(working)return;working=true;controls();
+    try{
+      const groups=selectedLineGroups();
+      const result=await timed(rpc('saveLineNotificationGroups',memberIdForSave,groups));
+      line.selectedGroups=Object.prototype.hasOwnProperty.call(result,'selectedGroups')?result.selectedGroups:groups;
+      status('LINE通知の対象グループを保存しました。');showLineGroups();
+    }catch(error){status(error.message||'LINE通知の対象を保存できませんでした。')}
+    finally{working=false;controls()}
+  };
+  host.append(state,label,mode,list,hint,save);
+}
 function controls(){
   if(!dialog)return;
-  dialog.querySelectorAll('[data-group-options] input,[data-group-options] select').forEach(el=>el.disabled=working);
+  dialog.querySelectorAll('[data-push-group-options] input,[data-push-group-options] select,[data-line-options] input,[data-line-options] select,[data-save-line-groups]').forEach(el=>el.disabled=working);
   const state=saved(),permitted=globalThis.Notification?.permission==='granted';
   dialog.querySelector('[data-enable]').disabled=working||!settings?.ready||!supported()||globalThis.Notification?.permission==='denied';
   dialog.querySelector('[data-enable]').textContent=state?.enabled&&permitted?'通知設定を保存':'通知を受け取る';
@@ -109,8 +148,9 @@ async function disable(){
 }
 export async function open(memberId){
   if(dialog?.open)return;
+  memberIdForSave=memberId;
   dialog?.remove();dialog=document.createElement('dialog');dialog.setAttribute('aria-labelledby','push-title');
-  dialog.innerHTML='<div class="modal-head"><h2 id="push-title">締切の通知</h2></div><div class="modal-body"><p>抽選締切日の昼12時以降に、その日が締切のイベントをまとめて通知します。</p><p class="muted">通知にはイベント名と投げ数を表示します。端末や通信の状態により遅れる場合があります。</p><p role="status" aria-live="polite">設定を確認しています…</p><p class="muted"><a href="./notifications-setup.html" target="_blank" rel="noopener">管理者向け：初回の設定手順</a></p><div data-group-options></div><button type="button" class="primary" data-enable disabled>通知を受け取る</button> <button type="button" data-disable hidden>通知をオフ</button> <button type="button" data-test hidden>テスト通知</button><p class="muted">iPhoneは「ホーム画面に追加」して、追加したアイコンから開いてください。</p></div><div class="modal-actions"><button type="button" data-close>閉じる</button></div>';
+  dialog.innerHTML='<div class="modal-head"><h2 id="push-title">締切の通知</h2></div><div class="modal-body"><p>抽選締切日の昼12時以降に、その日が締切のイベントをまとめて通知します。</p><p class="muted">LINEグループ通知は、設定した出演グループの締切をグループLINEへ1回送ります。Web通知はこの端末ごとの設定です。</p><p role="status" aria-live="polite">設定を確認しています…</p><fieldset><legend>LINEグループ通知</legend><div data-line-options></div></fieldset><fieldset><legend>この端末のWeb通知</legend><p class="muted">端末や通信の状態により通知が遅れる場合があります。</p><div data-push-group-options></div><button type="button" class="primary" data-enable disabled>通知を受け取る</button> <button type="button" data-disable hidden>通知をオフ</button> <button type="button" data-test hidden>テスト通知</button></fieldset><p class="muted"><a href="./notifications-setup.html" target="_blank" rel="noopener">管理者向け：初回の設定手順</a></p><p class="muted">iPhoneは「ホーム画面に追加」して、追加したアイコンから開いてください。</p></div><div class="modal-actions"><button type="button" data-close>閉じる</button></div>';
   document.body.appendChild(dialog);dialog.showModal();dialog.querySelector('[data-close]').onclick=()=>dialog.close();
   dialog.querySelector('[data-enable]').onclick=()=>enable(memberId);dialog.querySelector('[data-disable]').onclick=disable;
   dialog.querySelector('[data-test]').onclick=async()=>{
@@ -119,10 +159,11 @@ export async function open(memberId){
     catch(error){status(error.message)}finally{working=false;controls()}
   };
   settings=null;controls();
-  if(isIOSBrowser()){status('ホーム画面に追加したアイコンから開くと、通知を設定できます。');return}
-  if(!supported()){status('このブラウザでは通知を利用できません。対応する端末・ブラウザから開いてください。');return}
   try{
     const state=saved();settings=await rpc('getPushSettings',state?.id||null,state?.secret||null,true);
+    showLineGroups();
+    if(isIOSBrowser()){status('Web通知はホーム画面に追加したアイコンから設定できます。LINE通知の対象グループはここで選べます。');return}
+    if(!supported()){showGroups();status('このブラウザではWeb通知を利用できません。LINE通知の対象グループは設定できます。');return}
     showGroups();
     if(!settings?.ready)status('通知は管理者の初期設定待ちです。設定が完了したらここから登録できます。');
     else if(Notification.permission==='denied')status('通知がブロックされています。端末・ブラウザの設定から許可してください。');
