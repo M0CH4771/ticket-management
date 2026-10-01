@@ -235,9 +235,14 @@ function sendDeadlinePush_() {
   } finally { lock.releaseLock(); }
 }
 function lineBody_(events,today) {
-  const lines=['【抽選締切のお知らせ】',today+'締切のイベント'];
-  events.slice(0,8).forEach(l=>lines.push('・'+String(l.date||'').slice(5).replace('-','/')+' '+String(l.title).slice(0,80)+'（投げ数 '+(l.requiredThrows!==''&&l.requiredThrows!=null?l.requiredThrows+'枚':'未設定')+'）'));
-  if(events.length>8)lines.push('ほか'+(events.length-8)+'件');
+  const lines=['【本日締切】'];let included=0;
+  for(const l of events) {
+    const eventDate=normalizeDate_(l.date,Number(today.slice(0,4)))||String(l.date||'未登録');
+    const block=['','開催日：'+eventDate.replace(/-/g,'/'),'イベント名：'+String(l.title||'未登録'),'チケットURL：'+(l.purchaseUrl||'未登録'),'枠数：'+(l.requiredThrows!==''&&l.requiredThrows!=null?l.requiredThrows+'枚':'未設定')].join('\n');
+    if(lines.join('\n').length+block.length>4500)break;
+    lines.push(block);included++;
+  }
+  if(included<events.length)lines.push('','ほか'+(events.length-included)+'件（文字数上限のため省略）');
   return lines.join('\n');
 }
 // Explicit device-only test; never broadcasts and never exposes tokens.
