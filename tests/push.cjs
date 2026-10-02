@@ -8,6 +8,11 @@ const D=class extends Date{constructor(...args){super(...(args.length?args:[time
 const c=vm.createContext({Date:D,console,PropertiesService:{getScriptProperties:()=>p},LockService:{getUserLock:()=>({waitLock(){},tryLock:()=>true,releaseLock(){}})},Utilities:{formatDate:(d,tz,format)=>format==='H'?new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',hourCycle:'h23'}).format(d):d.toLocaleDateString('sv-SE',{timeZone:tz}),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,v)=>crypto.createHash('sha256').update(v).digest(),base64EncodeWebSafe:v=>Buffer.from(v).toString('base64url')},CacheService:{getScriptCache:()=>({remove:k=>cache.delete(k)})},UrlFetchApp:{fetch:(url,options)=>{requests.push({url,options});if(options.payload)sent.push(JSON.parse(options.payload));return {getResponseCode:()=>fetchStatus,getContentText:()=>JSON.stringify(fetchStatus===404?{error:{details:[{errorCode:'UNREGISTERED'}]}}:{name:'sent'})}}},resetRequest_(){},selectedMember_:id=>{if(id!=='me')throw Error('invalid member')},rows_:()=>lives});
 vm.runInContext(code.slice(code.indexOf('function normalizeDate_('),code.indexOf('function normalizeSheetDates_(')),c);
 vm.runInContext(source,c);c.pushAccessToken_=()=> 'test-token';
+let lineEnableCalled=false;c.installLineNotifications_=()=>{lineEnableCalled=true};
+c.Session={getActiveUser:()=>({getEmail:()=> 'admin@example.com'}),getEffectiveUser:()=>({getEmail:()=> 'admin@example.com'})};
+c.enableLineNotifications();assert.equal(lineEnableCalled,true);
+c.Session={getActiveUser:()=>({getEmail:()=> 'other@example.com'}),getEffectiveUser:()=>({getEmail:()=> 'admin@example.com'})};
+assert.throws(()=>c.enableLineNotifications(),/管理者アカウント/);
 assert.equal(c.getPushSettings().ready,false);
 p.setProperty('PUSH_FIREBASE_CONFIG',JSON.stringify({apiKey:'public-key',projectId:'project',messagingSenderId:'123',appId:'app',private_key:'must-not-leak'}));
 p.setProperty('PUSH_VAPID_PUBLIC_KEY','A'.repeat(87));p.setProperty('PUSH_SERVICE_ACCOUNT',JSON.stringify({project_id:'project',client_email:'service@example.com',private_key:'PRIVATE'}));p.setProperty('PUSH_ENABLED','yes');
