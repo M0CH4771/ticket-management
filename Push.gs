@@ -124,7 +124,7 @@ function installLineNotifications_() {
   if(response.getResponseCode()!==200)throw new Error('LINEへの接続を確認できませんでした。アクセストークン・グループID・Botがグループに参加しているかを確認してください');
   p.setProperty('LINE_ENABLED','yes');
   ensureDeadlineTrigger_();
-  console.log('LINE締切通知を有効にしました。確認メッセージを送信しました。');
+  console.log('LINEへの接続を確認し、締切通知を有効にしました。');
 }
 function stopLineNotifications_() {
   pushProperties_().deleteProperty('LINE_ENABLED');
