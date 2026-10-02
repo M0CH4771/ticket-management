@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+<title id="title">チケマネ</title>
+<rect width="512" height="512" rx="112" fill="#101114"/>
+<path d="M76 126a38 38 0 0 1 38-38h284a38 38 0 0 1 38 38v38a28 28 0 0 0 0 56v38a38 38 0 0 1-38 38H114a38 38 0 0 1-38-38v-38a28 28 0 0 0 0-56z" fill="#f6f4ef" stroke="#1764ff" stroke-width="12"/>
+<path d="M144 128v204" stroke="#1764ff" stroke-width="8" stroke-linecap="round" stroke-dasharray="8 16"/>
+<rect x="209" y="140" width="162" height="130" rx="20" fill="#fff" stroke="#17191d" stroke-width="9"/>
+<path d="M209 178h162" stroke="#17191d" stroke-width="9"/>
+<path d="M244 127v26m92-26v26" stroke="#17191d" stroke-width="12" stroke-linecap="round"/>
+<path d="m249 221 25 25 55-58" fill="none" stroke="#1764ff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="386" cy="119" r="25" fill="#ff645a" stroke="#101114" stroke-width="8"/>
+<text x="256" y="433" text-anchor="middle" fill="#fff" font-family="system-ui, -apple-system, 'Noto Sans JP', sans-serif" font-size="54" font-weight="800" letter-spacing="3">チケマネ</text>
+</svg>
