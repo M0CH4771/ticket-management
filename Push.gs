@@ -249,3 +249,16 @@ function enableNotifications() {
   }
   installPushNotifications_();
 }
+
+// Visible editor entry point for the one-time LINE setup.
+function enableLineNotifications() {
+  const active = Session.getActiveUser().getEmail();
+  const effective = Session.getEffectiveUser().getEmail();
+  if (!active || active !== effective) {
+    throw new Error('GASのエディタから管理者アカウントで実行してください');
+  }
+  if (typeof installLineNotifications_ !== 'function') {
+    throw new Error('Push.gsのLINE設定コードが不足しています。最新版を貼り直してください');
+  }
+  installLineNotifications_();
+}
