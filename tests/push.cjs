@@ -49,7 +49,7 @@ c.savePushSubscription('me',{...all,groups:null});c.sendDeadlinePush_();assert.e
 assert(!JSON.parse(p.getProperty('PUSH_DEVICE_00000000-0000-0000-0000-000000000002')).sentDay);
 // Untagged/invalid group data never matches a selected group; all still includes it.
 assert.equal(c.pushFilterEvents_(lives,['Missing']).length,0);assert.equal(c.pushFilterEvents_(lives,null).length,3);
-// LINE group filter is shared, secret-free in the browser response, and sends one group message per deadline day.
+// LINE uses one fixed destination; it sends every due event once per deadline day and keeps secrets server-side.
 for(const key of [...props.keys()])if(key.startsWith('PUSH_DEVICE_'))props.delete(key);
 p.deleteProperty('PUSH_ENABLED');p.setProperty('LINE_CHANNEL_ACCESS_TOKEN','secret-line-token');p.setProperty('LINE_GROUP_ID','C-group-id');p.setProperty('LINE_ENABLED','yes');
 const lineLives=[
@@ -57,19 +57,17 @@ const lineLives=[
  {id:'line2',title:'LINE B live',date:'2026-10-11',lotteryDeadline:'2026-09-27',groups:'["B"]',requiredThrows:'2',purchaseUrl:'https://example.test/ticket-b'},
  {id:'line3',title:'LINE C live',date:'2026-10-12',lotteryDeadline:'2026-09-27',groups:'["C"]',requiredThrows:'1',purchaseUrl:'https://example.test/ticket-c'}
 ];lives=lineLives;time=Date.parse('2026-09-27T12:05:00+09:00');
-assert.deepEqual(JSON.parse(JSON.stringify(c.getPushSettings(null,null,true).lineNotification)),{ready:true,selectedGroups:null,availableGroups:['A','B','C']});
-c.saveLineNotificationGroups('me',['A','B']);
 const publicSettings=JSON.stringify(c.getPushSettings(null,null,true));assert(!publicSettings.includes('secret-line-token'));assert(!publicSettings.includes('C-group-id'));
+assert(!publicSettings.includes('lineNotification'));
 const beforeLine=requests.length;c.sendDeadlinePush_();
 const lineRequest=requests.slice(beforeLine).find(r=>r.url==='https://api.line.me/v2/bot/message/push');assert(lineRequest);
 const lineText=JSON.parse(lineRequest.options.payload).messages[0].text;
 assert.match(lineText,/【本日締切】/);assert.match(lineText,/開催日：2026\/10\/10/);assert.match(lineText,/イベント名：LINE A and B live/);assert.match(lineText,/チケットURL：https:\/\/example\.test\/ticket-a/);assert.match(lineText,/枠数：3枚/);
-assert.match(lineText,/イベント名：LINE B live/);assert(!lineText.includes('LINE C live'));
+assert.match(lineText,/イベント名：LINE B live/);assert.match(lineText,/イベント名：LINE C live/);
 assert.equal(p.getProperty('LINE_SENT_DAY'),'2026-09-27');c.sendDeadlinePush_();assert.equal(requests.filter(r=>r.url==='https://api.line.me/v2/bot/message/push').length,1);
-assert.throws(()=>c.saveLineNotificationGroups('me',[]),/1つ以上/);assert.throws(()=>c.saveLineNotificationGroups('me',['Not an event group']),/一覧が更新/);
 console.log('PASS: per-device selections, same event with multiple selected groups once, all-groups mode, no-match skip, batch fairness, old-client preservation, credential checks');
 console.log('PASS: noon JST, no early/empty/past sends, date normalization, receipts, transient retry, opt-out ownership, expired tokens, public config excludes credentials');
-console.log('PASS: shared LINE group filter, one aggregated message per due day, selection validation, and no server secrets in public settings');
+console.log('PASS: one fixed LINE destination, all due events aggregated into one message per day, and no server secrets in public settings');
 (async()=>{
  const handlers={},shown=[],opened=[];
  const sw={self:{addEventListener:(k,f)=>handlers[k]=f,registration:{scope:'https://example.test/ticket-management/docs/',showNotification:(t,o)=>{shown.push({t,o});return Promise.resolve()}},clients:{claim:async()=>{},matchAll:async()=>[],openWindow:async url=>opened.push(url)},skipWaiting(){}},URL};
