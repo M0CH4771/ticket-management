@@ -1,8 +1,8 @@
 {
   "id": "../",
-  "name": "チケマネ",
-  "short_name": "チケマネ",
-  "lang": "ja",
+  "name": "Ticket Management",
+  "short_name": "Ticket",
+  "lang": "en",
   "start_url": "./",
   "scope": "../",
   "display": "standalone",
@@ -10,9 +10,9 @@
   "theme_color": "#fffdf9",
   "icons": [
     {
-      "src": "icons/chikemane.svg?v=2",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "icons/ticket-management.png?v=3",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any"
     }
   ]

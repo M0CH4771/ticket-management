@@ -1,10 +1,10 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Ticket Management</title>
-<link rel="icon" type="image/svg+xml" href="./icons/chikemane.svg?v=2">
-<link rel="apple-touch-icon" sizes="180x180" href="./icons/chikemane.svg?v=2">
+<link rel="icon" type="image/png" href="./icons/ticket-management.png?v=3">
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/ticket-management.png?v=3">
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#fffdf9">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="チケマネ">
+<meta name="apple-mobile-web-app-title" content="Ticket Management">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
 <style>
@@ -83,7 +83,7 @@
 /* Quiet, compact everyday interface. */
 :root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}
 header{background:#fff;color:#17191d;border-bottom:1px solid #cdd1d8;padding-top:15px;padding-bottom:15px}
-.brand{font-size:17px;font-weight:700;letter-spacing:-.03em;display:inline-flex;align-items:center;gap:8px;color:inherit;text-decoration:none}.brand img{width:38px;height:38px;display:block;flex:none;object-fit:contain}.brand span{font-size:18px;font-weight:800;letter-spacing:.02em;white-space:nowrap}
+.brand{font-size:17px;font-weight:700;letter-spacing:-.03em;display:inline-flex;align-items:center;gap:10px;color:inherit;text-decoration:none}.brand img{width:48px;height:48px;display:block;flex:none;object-fit:contain;border-radius:10px;background:#fff}.brand span{font-size:17px;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
 #logout{color:#424954;border-color:#bcc3ce;border-radius:5px}
 main{max-width:1080px}
 h1{font-size:24px;letter-spacing:0;font-weight:700}
@@ -337,13 +337,43 @@ html{scrollbar-gutter:stable}
 .calendar-view{margin-top:12px}.calendar-toolbar{display:flex;align-items:center;justify-content:center;gap:12px;margin:14px 0}.calendar-toolbar h2{min-width:150px;text-align:center;font-size:18px}.calendar-toolbar button{min-height:40px;padding:6px 13px;font-size:20px}.calendar-toolbar .calendar-today{font-size:13px;margin-left:4px}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid #d5d9e0;border-left:1px solid #d5d9e0;background:white}.calendar-weekday{text-align:center;padding:8px 4px;font-size:13px;font-weight:750;color:#4b515b;border-right:1px solid #d5d9e0;border-bottom:1px solid #d5d9e0;background:#f4f5f7}.calendar-day{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:5px;width:100%;min-width:0;min-height:112px;padding:8px;border:0;border-radius:0;border-right:1px solid #d5d9e0;border-bottom:1px solid #d5d9e0;background:white;text-align:left;overflow:hidden}.calendar-day:hover{background:#f5f8ff}.calendar-day.outside{background:#fafafa;color:#a1a6af}.calendar-day.today .calendar-day-number{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#175cd3;color:white}.calendar-day.selected{box-shadow:inset 0 0 0 2px #175cd3;background:#f5f8ff}.calendar-day-number{font-size:13px;font-weight:750;line-height:26px}.calendar-chips{display:flex;flex-direction:column;gap:3px;min-width:0}.calendar-chip{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;padding:2px 4px;background:#e8efff;color:#24478e;font-size:11px;line-height:1.45}.calendar-chip b{font-size:10px}.calendar-chip.deadline{background:#fff0df;color:#8c3c00}.calendar-markers{display:none}.calendar-agenda{margin-top:20px}.calendar-agenda>h2{font-size:16px;margin:0 0 10px}.calendar-day-events{margin-top:0}.calendar-empty{margin:0;padding:18px;background:white;border:1px solid #d5d9e0;border-radius:12px;color:#68707c;font-size:14px}
 @media(max-width:620px){.calendar-view{margin-top:8px}.calendar-toolbar{gap:6px;margin:8px 0}.calendar-toolbar h2{min-width:0;flex:1;font-size:16px}.calendar-toolbar button{min-height:38px;padding:4px 10px}.calendar-grid{margin:0 -2px}.calendar-weekday{padding:5px 1px;font-size:11px}.calendar-day{min-height:58px;padding:5px 2px;align-items:center;gap:2px}.calendar-day-number{font-size:12px;line-height:22px}.calendar-day.today .calendar-day-number{width:22px;height:22px}.calendar-chips{display:none}.calendar-markers{display:flex;align-items:center;justify-content:center;gap:2px;height:8px}.calendar-marker{display:inline-block;width:5px;height:5px;border-radius:50%;background:#2b56c8}.calendar-marker.deadline{background:#c45b08}.calendar-markers small{font-size:9px;color:#4b515b}.calendar-agenda{margin-top:14px}.calendar-agenda>h2{font-size:15px}}
 .startup-screen{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#fff;opacity:1;transition:opacity .2s ease}.startup-screen.closing{opacity:0;pointer-events:none}.startup-content{display:flex;flex-direction:column;align-items:center;gap:10px;color:#175cd3}.startup-ticket{width:48px;height:48px;animation:ticket-arrive .55s cubic-bezier(.2,.8,.2,1) both}.startup-title{font-size:18px;letter-spacing:.02em;color:#20242b;animation:startup-fade .45s .08s both}.startup-message{font-size:13px;color:#68707c;animation:startup-fade .45s .14s both}.startup-progress{width:84px;height:2px;overflow:hidden;background:#e8edf5;border-radius:2px;margin-top:4px}.startup-progress i{display:block;width:40%;height:100%;background:#175cd3;border-radius:2px;animation:startup-progress 1s ease-in-out infinite alternate}@keyframes ticket-arrive{from{opacity:0;transform:translateY(8px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes startup-fade{from{opacity:0}to{opacity:1}}@keyframes startup-progress{from{transform:translateX(-30%)}to{transform:translateX(160%)}}@media(prefers-reduced-motion:reduce){.startup-ticket,.startup-title,.startup-message,.startup-progress i{animation:none}.startup-screen{transition:none}}
+
+.brand{gap:10px}.brand img{width:48px;height:48px}
+.startup-screen{background:#fffdf9}
+.startup-content{gap:11px}
+.startup-ticket{width:min(240px,76vw);height:150px;display:grid;place-items:center;overflow:visible}
+.launch-ticket{width:100%;height:100%;overflow:visible;animation:ticket-launch 1.65s cubic-bezier(.18,.82,.28,1) both}
+.ticket-stub{transform-box:fill-box;transform-origin:left center;animation:stub-tear .82s .78s cubic-bezier(.2,.72,.25,1) both}
+.tear-seam{opacity:0;animation:seam-flash .55s .72s ease-out both}
+.startup-title{font-size:23px;font-weight:850;letter-spacing:-.025em;color:#10284b;animation:startup-fade .42s 1.15s both}
+.startup-message{font-size:13px;color:#68707c;animation:startup-fade .4s 1.32s both}
+.startup-progress{width:116px;height:3px;background:#e9edf3}
+.startup-progress i{background:#2788f5;animation:startup-progress 1s ease-in-out infinite alternate}
+@keyframes ticket-launch{0%{opacity:0;transform:translateY(58px) scale(.7) rotate(-14deg)}42%{opacity:1;transform:translateY(-8px) scale(1.04) rotate(4deg)}58%{transform:translateY(2px) scale(.99) rotate(-1deg)}72%,100%{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
+@keyframes stub-tear{0%,18%{opacity:1;transform:translate(0,0) rotate(0)}30%{transform:translate(-3px,0) rotate(-3deg)}42%{transform:translate(4px,-1px) rotate(4deg)}56%{transform:translate(-2px,1px) rotate(-2deg)}100%{opacity:.15;transform:translate(48px,23px) rotate(21deg)}}
+@keyframes seam-flash{0%,100%{opacity:0}30%,65%{opacity:1}}
+@media(max-width:520px){.brand img{width:42px;height:42px}.brand span{font-size:15px}header{gap:8px}}
+@media(prefers-reduced-motion:reduce){.launch-ticket,.ticket-stub,.tear-seam,.startup-title,.startup-message,.startup-progress i{animation:none!important}.startup-screen{transition:none}}
 </style></head><body><div id="startup-screen" class="startup-screen" role="status" aria-live="polite">
   <div class="startup-content">
-    <svg class="startup-ticket" viewBox="0 0 48 48" aria-hidden="true">
-      <path d="M9 10.5h30v8a5.5 5.5 0 0 0 0 11v8H9v-8a5.5 5.5 0 0 0 0-11z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>
-      <path d="M24 15v18" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="2.5 3"/>
-    </svg>
-    <strong class="startup-title">チケマネ</strong>
+    <div class="startup-ticket" aria-hidden="true">
+      <svg class="launch-ticket" viewBox="0 0 240 150">
+        <g class="ticket-main">
+          <path d="M28 18h132v114H28c-9 0-16-7-16-16V94c14 0 14-28 0-28V34c0-9 7-16 16-16Z" fill="#fff8e8" stroke="#10284b" stroke-width="7" stroke-linejoin="round"/>
+          <rect x="26" y="34" width="14" height="82" rx="7" fill="#2788f5"/>
+          <path d="m96 41 9 20 22 2-17 15 5 22-19-12-19 12 5-22-17-15 22-2z" fill="#ffc52e" stroke="#10284b" stroke-width="4" stroke-linejoin="round"/>
+          <path d="M64 112h69M69 122h57" stroke="#b8c0ce" stroke-width="5" stroke-linecap="round"/>
+        </g>
+        <g class="ticket-stub">
+          <path d="M160 18h52c9 0 16 7 16 16v32c-14 0-14 28 0 28v22c0 9-7 16-16 16h-52Z" fill="#ff6a58" stroke="#10284b" stroke-width="7" stroke-linejoin="round"/>
+          <g fill="#10284b">
+            <rect x="177" y="43" width="4" height="45" rx="2"/><rect x="185" y="43" width="7" height="45" rx="2"/><rect x="197" y="43" width="4" height="45" rx="2"/><rect x="205" y="43" width="6" height="45" rx="2"/>
+          </g>
+        </g>
+        <path class="tear-seam" d="M160 23v104" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-dasharray="4 8"/>
+      </svg>
+    </div>
+    <strong class="startup-title">Ticket Management</strong>
     <span class="startup-message">データを読み込んでいます</span>
     <span class="startup-progress" aria-hidden="true"><i></i></span>
   </div>
@@ -370,11 +400,18 @@ function suggestionList(id,values){return`<datalist id="${esc(id)}">${values.map
 const liveRequirements=l=>`<span style="display:block;margin-top:8px;line-height:1.7" class="muted">抽選締切：${esc(l.lotteryDeadline||'未設定')}<br>投げ数：${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</span>`;
 const groupTags=l=>(l.groups||[]).length?`<div class="group-tags" aria-label="出演グループ">${l.groups.map(g=>`<span class="group-tag">${esc(g)}</span>`).join('')}</div>`:'';
 const badge=s=>`<span class="badge ${s==='余り'?'available':s==='取引中'?'pending':s==='捌けた'?'done':''}">${esc(s)}</span>`;
+const startupStartedAt=performance.now();let startupCloseTimer=0;
 function finishStartup(){
   const screen=$('startup-screen');
-  if(!screen||screen.classList.contains('closing'))return;
-  screen.classList.add('closing');
-  setTimeout(()=>screen.remove(),220);
+  if(!screen||screen.classList.contains('closing')||startupCloseTimer)return;
+  const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const minimum=reduced?450:1900;
+  const wait=Math.max(0,minimum-(performance.now()-startupStartedAt));
+  startupCloseTimer=setTimeout(()=>{
+    if(!screen.isConnected)return;
+    screen.classList.add('closing');
+    setTimeout(()=>screen.remove(),220);
+  },wait);
 }
 function notice(s){clearTimeout(noticeTimer);$('notice').textContent=s;const inline=$('form-message');if(inline)inline.textContent=s; if(s==='保存しました'){noticeTimer=setTimeout(()=>{$('notice').textContent=''},3000)}}
 function rpc(fn,...args){return window.LivePocketTransport.call(fn,...args)}
