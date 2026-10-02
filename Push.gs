@@ -45,11 +45,6 @@ function getPushSettings(id,secret,includeGroups) {
       if(device&&device.hash!==hash)throw new Error('通知の登録情報が一致しません');
       result.selectedGroups=device?.groups??null;
     } else result.selectedGroups=null;
-    result.lineNotification={
-      ready:lineConfig_().ready,
-      selectedGroups:lineNotificationGroups_(),
-      availableGroups:result.availableGroups
-    };
   }
   return result;
 }
@@ -58,25 +53,6 @@ function lineConfig_() {
   const token=(p.getProperty('LINE_CHANNEL_ACCESS_TOKEN')||'').trim();
   const groupId=(p.getProperty('LINE_GROUP_ID')||'').trim();
   return {ready:p.getProperty('LINE_ENABLED')==='yes'&&token.length>0&&groupId.length>0,token,groupId};
-}
-function lineNotificationGroups_() {
-  const raw=pushProperties_().getProperty('LINE_NOTIFICATION_GROUPS');
-  if(!raw||raw==='*')return null;
-  try {const groups=JSON.parse(raw);return Array.isArray(groups)?groups:[];}catch(e){return [];}
-}
-function saveLineNotificationGroups(memberId,groups) {
-  resetRequest_();selectedMember_(memberId);
-  const available=[...new Set(rows_('Lives').flatMap(pushEventGroups_))];
-  if(groups===null) {
-    pushProperties_().setProperty('LINE_NOTIFICATION_GROUPS','*');
-    return {selectedGroups:null};
-  }
-  if(!Array.isArray(groups)||!groups.length||groups.length>100||groups.some(g=>typeof g!=='string'||!g.trim()||g.length>100))
-    throw new Error('通知する出演グループを1つ以上選んでください');
-  const selected=[...new Set(groups.map(g=>g.trim()))];
-  if(selected.some(g=>!available.includes(g)))throw new Error('出演グループの一覧が更新されています。画面を再読み込みしてください');
-  pushProperties_().setProperty('LINE_NOTIFICATION_GROUPS',JSON.stringify(selected));
-  return {selectedGroups:selected};
 }
 function pushIdentity_(id,secret) {
   if(!/^[a-f0-9-]{36}$/.test(id||'')||!/^[a-f0-9]{64}$/.test(secret||'')) throw new Error('通知の登録情報が無効です');
@@ -147,7 +123,6 @@ function installLineNotifications_() {
   const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/group/'+encodeURIComponent(groupId)+'/summary',{method:'get',headers:{Authorization:'Bearer '+token},muteHttpExceptions:true});
   if(response.getResponseCode()!==200)throw new Error('LINEへの接続を確認できませんでした。アクセストークン・グループID・Botがグループに参加しているかを確認してください');
   p.setProperty('LINE_ENABLED','yes');
-  if(!p.getProperty('LINE_NOTIFICATION_GROUPS'))p.setProperty('LINE_NOTIFICATION_GROUPS','*');
   ensureDeadlineTrigger_();
   console.log('LINE締切通知を有効にしました。確認メッセージを送信しました。');
 }
@@ -192,12 +167,11 @@ function sendDeadlinePush_() {
     const p=pushProperties_(),config=pushConfig_(),line=lineConfig_();
     const lives=pushDueEvents_(rows_('Lives'),today);if(!lives.length)return;
     if(line.ready&&p.getProperty('LINE_SENT_DAY')!==today) {
-      const events=pushFilterEvents_(lives,lineNotificationGroups_());
       const lineAttemptDay=p.getProperty('LINE_ATTEMPT_DAY')||'',lineAttempts=Number(p.getProperty('LINE_ATTEMPTS')||0),nextAttempt=Number(p.getProperty('LINE_NEXT_ATTEMPT')||0);
-      if(events.length&&!(lineAttemptDay===today&&(lineAttempts>=3||nextAttempt>Date.now()))) {
+      if(!(lineAttemptDay===today&&(lineAttempts>=3||nextAttempt>Date.now()))) {
         p.setProperty('LINE_ATTEMPT_DAY',today);p.setProperty('LINE_ATTEMPTS',String(lineAttemptDay===today?lineAttempts+1:1));p.setProperty('LINE_NEXT_ATTEMPT',String(Date.now()+15*60000));
         try {
-          const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+line.token},muteHttpExceptions:true,payload:JSON.stringify({to:line.groupId,messages:[{type:'text',text:lineBody_(events,today)}]})});
+          const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+line.token},muteHttpExceptions:true,payload:JSON.stringify({to:line.groupId,messages:[{type:'text',text:lineBody_(lives,today)}]})});
           if(response.getResponseCode()===200)p.setProperty('LINE_SENT_DAY',today);
           else p.setProperty('LINE_LAST_STATUS','HTTP '+response.getResponseCode());
         } catch(e) { p.setProperty('LINE_LAST_STATUS','network-error'); }
