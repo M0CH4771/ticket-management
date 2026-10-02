@@ -1,12 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
 <title id="title">チケマネ</title>
-<rect width="512" height="512" rx="96" fill="#f8f8f6"/>
-<path d="M111 169a28 28 0 0 1 28-28h232a28 28 0 0 1 28 28v57a31 31 0 0 0 0 62v57a28 28 0 0 1-28 28H139a28 28 0 0 1-28-28v-57a31 31 0 0 0 0-62z" fill="#fff" stroke="#10234b" stroke-width="13"/>
-<path d="M163 158v218" stroke="#10234b" stroke-width="11" stroke-linecap="round" stroke-dasharray="8 17"/>
-<rect x="229" y="189" width="137" height="125" rx="13" fill="#fff" stroke="#10234b" stroke-width="11"/>
-<path d="M229 224h137" stroke="#1764ff" stroke-width="23"/>
-<path d="M263 178v25m69-25v25" stroke="#10234b" stroke-width="13" stroke-linecap="round"/>
-<path d="m260 270 25 24 50-56" fill="none" stroke="#1764ff" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
-<circle cx="397" cy="111" r="45" fill="#f8f8f6" stroke="#10234b" stroke-width="9"/>
-<circle cx="397" cy="111" r="28" fill="#a7ec2e"/>
+<rect width="512" height="512" rx="104" fill="#fff"/>
+<path d="M78 150h356a38 38 0 0 1 38 38v34a34 34 0 0 0 0 68v34a38 38 0 0 1-38 38H78a38 38 0 0 1-38-38v-34a34 34 0 0 0 0-68v-34a38 38 0 0 1 38-38Z" fill="#fff" stroke="#1f303d" stroke-width="11"/>
+<rect x="63" y="183" width="279" height="145" rx="22" fill="#fff7e2" stroke="#ffe1aa" stroke-width="3"/>
+<rect x="72" y="165" width="65" height="12" rx="6" fill="#f4685d"/>
+<rect x="145" y="165" width="36" height="12" rx="6" fill="#ffc943"/>
+<rect x="189" y="165" width="49" height="12" rx="6" fill="#2277c9"/>
+<text x="202" y="257" text-anchor="middle" dominant-baseline="central" font-family="system-ui,-apple-system,'Hiragino Kaku Gothic ProN','Yu Gothic','Noto Sans JP',sans-serif" font-size="55" font-weight="800" letter-spacing="1" fill="#1f303d">チケマネ</text>
+<path d="M350 166v174" stroke="#fff" stroke-width="10" stroke-dasharray="6 12"/>
+<rect x="356" y="184" width="95" height="143" rx="17" fill="#e2f6fb"/>
+<g fill="#2277c9">
+<rect x="369" y="222" width="4" height="55" rx="2"/><rect x="378" y="222" width="7" height="55" rx="2"/><rect x="391" y="222" width="4" height="55" rx="2"/><rect x="400" y="222" width="6" height="55" rx="2"/><rect x="412" y="222" width="4" height="55" rx="2"/><rect x="421" y="222" width="7" height="55" rx="2"/><rect x="434" y="222" width="4" height="55" rx="2"/>
+</g>
+<circle cx="385" cy="297" r="6" fill="#f4685d"/><circle cx="404" cy="297" r="6" fill="#ffc943"/><circle cx="423" cy="297" r="6" fill="#6ac9b7"/>
 </svg>
