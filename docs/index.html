@@ -332,14 +332,18 @@ html{scrollbar-gutter:stable}
 }
 
 .event-list .event-tile .event-footer{grid-column:1 / -1}
+
+/* Month calendar view */
+.calendar-view{margin-top:12px}.calendar-toolbar{display:flex;align-items:center;justify-content:center;gap:12px;margin:14px 0}.calendar-toolbar h2{min-width:150px;text-align:center;font-size:18px}.calendar-toolbar button{min-height:40px;padding:6px 13px;font-size:20px}.calendar-toolbar .calendar-today{font-size:13px;margin-left:4px}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid #d5d9e0;border-left:1px solid #d5d9e0;background:white}.calendar-weekday{text-align:center;padding:8px 4px;font-size:13px;font-weight:750;color:#4b515b;border-right:1px solid #d5d9e0;border-bottom:1px solid #d5d9e0;background:#f4f5f7}.calendar-day{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:5px;width:100%;min-width:0;min-height:112px;padding:8px;border:0;border-radius:0;border-right:1px solid #d5d9e0;border-bottom:1px solid #d5d9e0;background:white;text-align:left;overflow:hidden}.calendar-day:hover{background:#f5f8ff}.calendar-day.outside{background:#fafafa;color:#a1a6af}.calendar-day.today .calendar-day-number{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#175cd3;color:white}.calendar-day.selected{box-shadow:inset 0 0 0 2px #175cd3;background:#f5f8ff}.calendar-day-number{font-size:13px;font-weight:750;line-height:26px}.calendar-chips{display:flex;flex-direction:column;gap:3px;min-width:0}.calendar-chip{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;padding:2px 4px;background:#e8efff;color:#24478e;font-size:11px;line-height:1.45}.calendar-chip b{font-size:10px}.calendar-chip.deadline{background:#fff0df;color:#8c3c00}.calendar-markers{display:none}.calendar-agenda{margin-top:20px}.calendar-agenda>h2{font-size:16px;margin:0 0 10px}.calendar-day-events{margin-top:0}.calendar-empty{margin:0;padding:18px;background:white;border:1px solid #d5d9e0;border-radius:12px;color:#68707c;font-size:14px}
+@media(max-width:620px){.calendar-view{margin-top:8px}.calendar-toolbar{gap:6px;margin:8px 0}.calendar-toolbar h2{min-width:0;flex:1;font-size:16px}.calendar-toolbar button{min-height:38px;padding:4px 10px}.calendar-grid{margin:0 -2px}.calendar-weekday{padding:5px 1px;font-size:11px}.calendar-day{min-height:58px;padding:5px 2px;align-items:center;gap:2px}.calendar-day-number{font-size:12px;line-height:22px}.calendar-day.today .calendar-day-number{width:22px;height:22px}.calendar-chips{display:none}.calendar-markers{display:flex;align-items:center;justify-content:center;gap:2px;height:8px}.calendar-marker{display:inline-block;width:5px;height:5px;border-radius:50%;background:#2b56c8}.calendar-marker.deadline{background:#c45b08}.calendar-markers small{font-size:9px;color:#4b515b}.calendar-agenda{margin-top:14px}.calendar-agenda>h2{font-size:15px}}
 </style></head><body><header><div class="brand">Ticket Management</div><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=832f55ba"></script>
 <script src="./transport.js"></script>
 <script>
 let data=null,selected='',filter='すべて',busy=false,memberId='',searchQuery='',groupFilter='',lastDay='',homeScroll=0,noticeTimer=null,modalDirty=false,searchTimer=0;
 let managerLiveId='',managerMode='',myFilter='すべて';
-let viewMode='list',cachedView=false,loading=false,refreshVersion=0;
-try{viewMode=localStorage.getItem('ticket-view-mode')==='tiles'?'tiles':'list'}catch(e){}
+let viewMode='list',cachedView=false,loading=false,refreshVersion=0,calendarMonth='',calendarSelectedDate='';
+try{const savedView=localStorage.getItem('ticket-view-mode');viewMode=savedView==='tiles'||savedView==='calendar'?'calendar':'list'}catch(e){}
 try{memberId=localStorage.getItem('live-pocket-member')||'';sessionStorage.removeItem('live-pocket-key')}catch(e){}
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -584,9 +588,80 @@ function updateSaveView(action){
 }
 function renderHome(){if(!data)return;const today=japanDay();lastDay=today;const lives=sortedEvents(data.lives.filter(l=>l.date>=today),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
 $('account').innerHTML=`<span class="account-name">${esc(data.me.name)}</span><button id="logout">メンバー切替</button><button type="button" id="notification-settings">通知設定</button>`;$('logout').onclick=()=>{if(busy)return;if(outbox.length){notice('保存の保留を解決してからメンバーを切り替えてください');return}confirmedData=null;rememberMember('');notice('');chooseMemberScreen()};
-$('app').innerHTML=`<div id="sync-host">${syncPanel()}</div><div class="top"><div><h1 style="margin-top:6px">イベント一覧</h1></div><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>${`<div class="home-filters"><div><label for="search">イベントを探す</label><input id="search" type="search" class="search" placeholder="イベント名・会場・グループ" value="${esc(searchQuery)}"></div><div><label for="group-filter">出演グループ</label><select id="group-filter"><option value="">すべてのグループ</option>${groups.map(g=>`<option value="${esc(g)}" ${g===groupFilter?'selected':''}>${esc(g)}</option>`).join('')}</select></div></div><div class="my-filters" role="group" aria-label="自分の状況で絞り込み">${['すべて','参戦予定','未回答','自分の余りあり'].map(f=>`<button data-my-filter="${f}" aria-pressed="${myFilter===f}">${f}</button>`).join('')}</div><div class="results-toolbar"><div class="results-info"><span id="event-count" role="status" aria-live="polite"></span><button id="my-surplus-list" class="my-surplus-list" aria-label="自分の余り一覧（開催予定の全イベント）">余り一覧 <strong>${personalSurplusEvents().reduce((n,x)=>n+x.tickets.length,0)}枚</strong></button><button id="clear-filters" hidden>絞り込み解除</button></div><div class="view-switch" role="group" aria-label="表示方法"><button data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button data-view="tiles" aria-pressed="${viewMode==='tiles'}">タイル</button></div></div><div class="event-grid ${viewMode==='list'?'event-list':''}" id="lives"></div><p id="empty-events" class="empty" hidden></p>`}<p class="foot">最終読込 ${cachedView?'前回の表示（未更新） · ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}（日本時間）</p>`;
+$('app').innerHTML=`<div id="sync-host">${syncPanel()}</div><div class="top"><div><h1 style="margin-top:6px">イベント一覧</h1></div><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>${`<div class="home-filters"><div><label for="search">イベントを探す</label><input id="search" type="search" class="search" placeholder="イベント名・会場・グループ" value="${esc(searchQuery)}"></div><div><label for="group-filter">出演グループ</label><select id="group-filter"><option value="">すべてのグループ</option>${groups.map(g=>`<option value="${esc(g)}" ${g===groupFilter?'selected':''}>${esc(g)}</option>`).join('')}</select></div></div><div class="my-filters" role="group" aria-label="自分の状況で絞り込み">${['すべて','参戦予定','未回答','自分の余りあり'].map(f=>`<button data-my-filter="${f}" aria-pressed="${myFilter===f}">${f}</button>`).join('')}</div><div class="results-toolbar"><div class="results-info"><span id="event-count" role="status" aria-live="polite"></span><button id="my-surplus-list" class="my-surplus-list" aria-label="自分の余り一覧（開催予定の全イベント）">余り一覧 <strong>${personalSurplusEvents().reduce((n,x)=>n+x.tickets.length,0)}枚</strong></button><button id="clear-filters" hidden>絞り込み解除</button></div><div class="view-switch" role="group" aria-label="表示方法"><button data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button data-view="calendar" aria-pressed="${viewMode==='calendar'}">カレンダー</button></div></div><div class="event-grid ${viewMode==='list'||viewMode==='calendar'?'event-list':''}" id="lives"></div><p id="empty-events" class="empty" hidden></p>`}<p class="foot">最終読込 ${cachedView?'前回の表示（未更新） · ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}（日本時間）</p>`;
 $('notification-settings').onclick=()=>import('./notifications.js').then(m=>m.open(memberId)).catch(()=>notice('通知設定を開けませんでした。再読込してください。'));document.querySelectorAll('[data-my-filter]').forEach(b=>b.onclick=()=>{myFilter=b.dataset.myFilter;render()});$('my-surplus-list').onclick=personalSurplusList;$('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();{drawTiles(lives,today);$('clear-filters').onclick=()=>{clearTimeout(searchTimer);searchQuery='';groupFilter='';myFilter='すべて';document.querySelectorAll('[data-my-filter]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.myFilter===myFilter));$('search').value='';$('group-filter').value='';drawTiles(lives,today)};$('group-filter').onchange=e=>{groupFilter=e.target.value;drawTiles(lives,today)};$('search').oninput=e=>{searchQuery=e.target.value;clearTimeout(searchTimer);searchTimer=setTimeout(()=>drawTiles(lives,today),120)};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{viewMode=b.dataset.view;try{localStorage.setItem('ticket-view-mode',viewMode)}catch(e){}render()})}showRefreshState();bindSyncPanel()}
-function drawTiles(lives,today){const q=searchQuery.trim().normalize('NFKC').toLowerCase();const visible=lives.filter(l=>matchesMyFilter(l)&&(!groupFilter||(l.groups||[]).includes(groupFilter))&&(l.title+' '+l.venue+' '+(l.groups||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q));if($('event-count'))$('event-count').textContent=visible.length+'件'+(q||groupFilter||myFilter!=='すべて'?' / 全'+lives.length+'件':'のイベント');if($('clear-filters'))$('clear-filters').hidden=!(q||groupFilter||myFilter!=='すべて');$('lives').innerHTML=visible.map(l=>eventTile(l,data.tickets,today)).join('');$('empty-events').hidden=visible.length>0;$('empty-events').textContent=lives.length?'該当するイベントはありません。':'「＋ イベント登録」からイベントを登録してください。';document.querySelectorAll('[data-copy-surplus]').forEach(b=>b.onclick=()=>copySurplus(data.lives.find(l=>l.id===b.dataset.copySurplus)));document.querySelectorAll('[data-register]').forEach(b=>b.onclick=()=>{if(busy)return;ticketManager(b.dataset.register)});document.querySelectorAll('[data-attendance]').forEach(el=>el.onchange=async()=>{const liveId=el.dataset.attendance;const mine=data.attendance.find(a=>a.liveId===liveId&&a.memberId===data.me.id);await save('attendance',{liveId,status:el.value,version:mine?.version});if(!$('modal').open)updateSaveView('attendance')});document.querySelectorAll('[data-edit-live]').forEach(b=>b.onclick=()=>liveForm(data.lives.find(l=>l.id===b.dataset.editLive)))}
+function drawTiles(lives,today){
+  const q=searchQuery.trim().normalize('NFKC').toLowerCase();
+  const visible=lives.filter(l=>matchesMyFilter(l)&&(!groupFilter||(l.groups||[]).includes(groupFilter))&&(l.title+' '+l.venue+' '+(l.groups||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q));
+  if($('event-count'))$('event-count').textContent=visible.length+'件'+(q||groupFilter||myFilter!=='すべて'?' / 全'+lives.length+'件':'のイベント');
+  if($('clear-filters'))$('clear-filters').hidden=!(q||groupFilter||myFilter!=='すべて');
+  $('empty-events').hidden=visible.length>0;
+  $('empty-events').textContent=lives.length?'該当するイベントはありません。':'「＋ イベント登録」からイベントを登録してください。';
+  if(viewMode==='calendar'){renderCalendar(visible,today,lives);$('empty-events').hidden=true}
+  else{$('lives').innerHTML=visible.map(l=>eventTile(l,data.tickets,today)).join('');bindEventCards()}
+}
+function bindEventCards(){
+  document.querySelectorAll('[data-copy-surplus]').forEach(b=>b.onclick=()=>copySurplus(data.lives.find(l=>l.id===b.dataset.copySurplus)));
+  document.querySelectorAll('[data-register]').forEach(b=>b.onclick=()=>{if(busy)return;ticketManager(b.dataset.register)});
+  document.querySelectorAll('[data-attendance]').forEach(el=>el.onchange=async()=>{
+    const liveId=el.dataset.attendance,mine=data.attendance.find(a=>a.liveId===liveId&&a.memberId===data.me.id);
+    await save('attendance',{liveId,status:el.value,version:mine?.version});
+    if(!$('modal').open)updateSaveView('attendance');
+  });
+  document.querySelectorAll('[data-edit-live]').forEach(b=>b.onclick=()=>liveForm(data.lives.find(l=>l.id===b.dataset.editLive)));
+}
+function calendarMonthLabel(month){
+  const p=month.split('-').map(Number);
+  return new Date(Date.UTC(p[0],p[1]-1,1)).toLocaleDateString('ja-JP',{timeZone:'UTC',year:'numeric',month:'long'});
+}
+function calendarDateLabel(day){
+  const p=day.split('-').map(Number),date=new Date(Date.UTC(p[0],p[1]-1,p[2]));
+  return date.toLocaleDateString('ja-JP',{timeZone:'UTC',month:'long',day:'numeric',weekday:'short'});
+}
+function monthShift(month,delta){
+  const p=month.split('-').map(Number),date=new Date(Date.UTC(p[0],p[1]-1+delta,1));
+  return date.toISOString().slice(0,7);
+}
+function renderCalendar(events,today,allLives){
+  if(!calendarMonth)calendarMonth=today.slice(0,7);
+  if(!calendarSelectedDate)calendarSelectedDate=today;
+  const p=calendarMonth.split('-').map(Number),year=p[0],month=p[1];
+  const firstDay=new Date(Date.UTC(year,month-1,1)).getUTCDay();
+  const daysInMonth=new Date(Date.UTC(year,month,0)).getUTCDate();
+  const cellCount=firstDay+daysInMonth>35?42:35;
+  const startDate=new Date(Date.UTC(year,month-1,1-firstDay)),cells=[];
+  for(let i=0;i<cellCount;i++){
+    const d=new Date(startDate);d.setUTCDate(startDate.getUTCDate()+i);
+    const day=d.toISOString().slice(0,10),inMonth=d.getUTCMonth()===month-1,entries=[];
+    for(const live of events){
+      if(live.date===day)entries.push({live,type:'live'});
+      if(live.lotteryDeadline===day)entries.push({live,type:'deadline'});
+    }
+    const markers=entries.slice(0,3).map(e=>'<i class="calendar-marker '+e.type+'" aria-hidden="true"></i>').join('');
+    const chips=entries.slice(0,3).map(e=>'<span class="calendar-chip '+e.type+'" title="'+esc(e.type==='deadline'?'抽選締切：':'開催：')+esc(e.live.title)+'"><b>'+(e.type==='deadline'?'締切':'開催')+'</b> '+esc(e.live.title)+'</span>').join('');
+    cells.push('<button type="button" class="calendar-day '+(inMonth?'':'outside')+' '+(day===today?'today':'')+' '+(day===calendarSelectedDate?'selected':'')+'" data-cal-date="'+day+'" aria-label="'+calendarDateLabel(day)+'、'+entries.length+'件">'+
+      '<span class="calendar-day-number">'+d.getUTCDate()+'</span><span class="calendar-markers">'+markers+(entries.length>3?'<small>+'+(entries.length-3)+'</small>':'')+'</span>'+
+      '<span class="calendar-chips">'+chips+(entries.length>3?'<small>ほか'+(entries.length-3)+'件</small>':'')+'</span></button>');
+  }
+  const selected=events.filter(l=>l.date===calendarSelectedDate||l.lotteryDeadline===calendarSelectedDate).sort((a,b)=>a.date.localeCompare(b.date)||a.title.localeCompare(b.title,'ja'));
+  const selectedCards=selected.map(l=>eventTile(l,data.tickets,today)).join('');
+  const label=calendarMonthLabel(calendarMonth);
+  $('lives').innerHTML='<section class="calendar-view" aria-label="イベントカレンダー">'+
+    '<div class="calendar-toolbar"><button type="button" data-cal-prev aria-label="前の月">‹</button><h2>'+label+'</h2><button type="button" data-cal-next aria-label="次の月">›</button><button type="button" class="calendar-today" data-cal-today>今月</button></div>'+
+    '<div class="calendar-grid" role="grid" aria-label="'+label+'">'+
+    ['日','月','火','水','木','金','土'].map(day=>'<div class="calendar-weekday" role="columnheader">'+day+'</div>').join('')+cells.join('')+'</div>'+
+    '<section class="calendar-agenda"><h2>'+calendarDateLabel(calendarSelectedDate)+'の予定</h2>'+
+    (selectedCards?'<div class="calendar-day-events event-grid event-list">'+selectedCards+'</div>':'<p class="calendar-empty">この日のイベント・抽選締切はありません。</p>')+
+    '</section></section>';
+  $('lives').querySelector('[data-cal-prev]').onclick=()=>{calendarMonth=monthShift(calendarMonth,-1);calendarSelectedDate=calendarMonth+'-01';drawTiles(allLives,today)};
+  $('lives').querySelector('[data-cal-next]').onclick=()=>{calendarMonth=monthShift(calendarMonth,1);calendarSelectedDate=calendarMonth+'-01';drawTiles(allLives,today)};
+  $('lives').querySelector('[data-cal-today]').onclick=()=>{calendarMonth=today.slice(0,7);calendarSelectedDate=today;drawTiles(allLives,today)};
+  $('lives').querySelectorAll('[data-cal-date]').forEach(button=>button.onclick=()=>{
+    const day=button.dataset.calDate;if(day.slice(0,7)!==calendarMonth)calendarMonth=day.slice(0,7);
+    calendarSelectedDate=day;drawTiles(allLives,today);
+  });
+  bindEventCards();
+}
 
 function canEditLive(l){return l.owner===data.me.id||!data.members.some(m=>m.id===l.owner)}
 function ticketPending(t){return String(t.id).startsWith('pending-')||outbox.some(item=>item.payload.id===t.id)}
