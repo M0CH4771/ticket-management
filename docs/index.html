@@ -354,6 +354,11 @@ html{scrollbar-gutter:stable}
 @keyframes seam-flash{0%,100%{opacity:0}30%,65%{opacity:1}}
 @media(max-width:520px){.brand img{width:42px;height:42px}.brand span{font-size:15px}header{gap:8px}}
 @media(prefers-reduced-motion:reduce){.launch-ticket,.ticket-stub,.tear-seam,.startup-title,.startup-message,.startup-progress i{animation:none!important}.startup-screen{transition:none}}
+
+.memo-quick{margin-top:5px}
+.memo-quick summary{color:#175cd3;font-size:12px;font-weight:700;cursor:pointer;min-height:36px;padding:7px 0}
+.memo-quick textarea{display:block;width:100%;min-height:64px;margin:4px 0 7px;padding:9px;font-size:13px}
+.memo-quick .memo-save{min-height:38px;padding:7px 12px;font-size:12px}
 </style></head><body><div id="startup-screen" class="startup-screen" role="status" aria-live="polite">
   <div class="startup-content">
     <div class="startup-ticket" aria-hidden="true">
@@ -476,7 +481,7 @@ function operationKey(action,p){return action==='live'?'live:'+(p.id||'new'):act
 function optimisticPatch(base,item){
   const p=item.payload,id='pending-'+item.id,version=String(Number(p.version||0)+1);
   let table,row,remove=[];
-  if(item.action==='live'){table='Lives';row={...p,id:p.id||id,owner:base.me.id,version,groups:p.groups||[]};}
+  if(item.action==='live'){table='Lives';const existingLive=p.id&&base.lives.find(l=>l.id===p.id);row={...p,id:p.id||id,owner:existingLive?.owner||base.me.id,version,groups:p.groups||[]};}
   else if(item.action==='attendance'){table='Attendance';const old=base.attendance.find(a=>a.liveId===p.liveId&&a.memberId===base.me.id);row={id:old?.id||id,liveId:p.liveId,memberId:base.me.id,status:p.status,version};}
   else if(item.action==='addTickets')return {kind:'patch-v1',changes:{Tickets:{upsert:p.entries.map((e,i)=>({...e,id:id+'-'+i,liveId:p.liveId,memberId:base.me.id,recipient:'',memo:'',version:'1'})),remove:[]}}};
   else {table='Tickets';if(item.action==='deleteTicket')remove=[p.id];else row={...base.tickets.find(t=>t.id===p.id),...p,version};}
@@ -613,7 +618,7 @@ function eventTile(l,tickets,today){
   return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''}" data-event="${esc(l.id)}">
     <div class="event-overview"><div class="event-dateline"><time class="date" datetime="${esc(l.date)}" title="${esc(l.date)}">${esc(eventDateLabel(l.date))}</time>${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}</div>
     <h2>${esc(l.title)}</h2><p class="muted event-venue">${venueMapLink(l.venue)}</p>${groupTags(l)}
-    <div class="my-attendance"><label for="attendance-${esc(l.id)}">自分の参戦予定</label><select id="attendance-${esc(l.id)}" data-attendance="${esc(l.id)}"><option value="" disabled ${mine==='未回答'?'selected':''}>未回答</option>${opts(['参戦','未定','不参加'],mine)}</select></div>${l.memo?`<div class="event-memo"><span class="muted">メモ</span><p class="note">${esc(l.memo)}</p></div>`:''}</div>
+    <div class="my-attendance"><label for="attendance-${esc(l.id)}">自分の参戦予定</label><select id="attendance-${esc(l.id)}" data-attendance="${esc(l.id)}"><option value="" disabled ${mine==='未回答'?'selected':''}>未回答</option>${opts(['参戦','未定','不参加'],mine)}</select></div>${l.memo?`<div class="event-memo"><span class="muted">メモ</span><p class="note">${esc(l.memo)}</p></div>`:''}<details class="memo-quick"><summary>${l.memo?'メモを編集':'＋ メモを追加'}</summary><textarea data-memo-input="${esc(l.id)}" rows="2" maxlength="500" aria-label="${esc(l.title)}のメモ" placeholder="メモを入力">${esc(l.memo||'')}</textarea><button type="button" class="memo-save" data-save-memo="${esc(l.id)}">メモを保存</button></details></div>
     <div class="event-facts">${extra}${canEditLive(l)?`<button class="edit-event" data-edit-live="${esc(l.id)}" aria-label="${esc(l.title)}を編集">イベント編集</button>`:''}</div>
     <button class="my-ticket-summary" data-register="${esc(l.id)}" aria-label="${esc(l.title)}の番号を登録・編集"><span class="ticket-summary-values">${myTicketSummary(l.id)}</span><span class="ticket-summary-action">登録・編集 <span aria-hidden="true">›</span></span></button>
     <div class="event-footer">${attendanceDropdown(l)}<button class="copy-surplus" data-copy-surplus="${esc(l.id)}">余り情報をコピー</button></div>
@@ -664,6 +669,15 @@ function bindEventCards(){
     if(!$('modal').open)updateSaveView('attendance');
   });
   document.querySelectorAll('[data-edit-live]').forEach(b=>b.onclick=()=>liveForm(data.lives.find(l=>l.id===b.dataset.editLive)));
+  document.querySelectorAll('[data-save-memo]').forEach(b=>b.onclick=()=>{
+    if(busy)return;
+    const live=data.lives.find(l=>l.id===b.dataset.saveMemo);
+    const card=b.closest('[data-event]'),input=card?.querySelector('[data-memo-input]');
+    if(!live||!input)return;
+    const memo=input.value.trim();
+    if(memo===(live.memo||'')){const details=b.closest('details');if(details)details.open=false;return}
+    save('live',{...live,memo,version:live.version});
+  });
 }
 function calendarMonthLabel(month){
   const p=month.split('-').map(Number);
@@ -718,7 +732,7 @@ function renderCalendar(events,today,allLives){
   bindEventCards();
 }
 
-function canEditLive(l){return l.owner===data.me.id||!data.members.some(m=>m.id===l.owner)}
+function canEditLive(l){return !String(l.id||'').startsWith('pending-')}
 function ticketPending(t){return String(t.id).startsWith('pending-')||outbox.some(item=>item.payload.id===t.id)}
 function backToTickets(){if(busy)return;if(modalDirty&&!confirm('入力中の内容を破棄して戻りますか？'))return;ticketManager(managerLiveId)}
 function refreshTicketManager(){if(!modalDirty&&managerLiveId&&managerMode==='list'&&$('modal').open)ticketManager(managerLiveId)}
