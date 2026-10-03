@@ -30,7 +30,10 @@ d=c.saveData(key,'ticket',{...t,status:'捌けた',recipient:'友人'});assert.e
 c.saveData(key,'addTickets',{liveId,numbers:['',''],status:'未発券'});assert.equal(c.getData(key).tickets.length,5);
 assert.throws(()=>c.saveData(key,'addTickets',{liveId,numbers:[''],status:'余り'}));
 const pending=c.getData(key).tickets.find(t=>t.status==='未発券');c.saveData(key,'ticket',{...pending,number:'A99',status:'自分用'});
-assert.throws(()=>c.saveData(other,'live',{...d.lives[0],title:'変更'}));
+const sharedEdit=c.saveData(other,'live',{...d.lives[0],title:'変更',memo:'別メンバーのメモ'}).lives[0];
+assert.equal(sharedEdit.title,'変更');assert.equal(sharedEdit.memo,'別メンバーのメモ');
+assert.throws(()=>c.saveData(key,'live',{...d.lives[0],title:'古い変更'}),/他の更新/);
+assert.throws(()=>c.saveData('invalid','live',{...sharedEdit,title:'無効'}),/名前/);
 c.saveData(key,'deleteTicket',{...d.tickets[0]});assert.equal(c.getData(key).tickets.length,4);
 // Upgrade an old sheet, preserving data and adding only the two new columns.
 tables.Lives.r=tables.Lives.r.map(r=>r.slice(0,8));
@@ -125,7 +128,7 @@ console.log('PASS: short/full/native dates, invalid and leap dates, IDs, JST mid
 
 const third=c.registerMember('Charlie');
 let editable=c.saveData(other,'live',{title:'編集対象',date:'2027-02-01'}).lives.find(l=>l.title==='編集対象');
-assert.throws(()=>c.saveData(third.id,'live',{...editable,title:'別人'}),/登録者/);
+assert.equal(c.saveData(third.id,'live',{...editable,title:'別人'}).lives.find(l=>l.id===editable.id).title,'別人');
 tables.Lives.r.find(r=>r[0]===editable.id)[6]='copied-invalid-owner';
 editable=c.getData(other).lives.find(l=>l.id===editable.id);
 const edited=c.saveData(other,'live',{...editable,title:'編集できた'}).lives.find(l=>l.id===editable.id);
@@ -139,11 +142,11 @@ assert.equal(io.opens,1);assert.equal(io.ranges,4);
 // A new request must see direct spreadsheet edits, not an earlier cached snapshot.
 tables.Lives.r.find(r=>r[0]===editable.id)[1]='スプシ変更';
 assert.equal(c.getData(other).lives.find(l=>l.id===editable.id).title,'スプシ変更');
-console.log('PASS: imported event edit/claim, valid owner guard, stale edit guard, one workbook open/four table reads, fresh reload');
+console.log('PASS: imported event edit/claim, shared event editing, stale edit guard, one workbook open/four table reads, fresh reload');
 
 // Exercise the exact frontend merge with real backend receipts for every mutation.
 const frontScript=fs.readFileSync(__dirname+'/../docs/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
-const front=vm.createContext({sessionStorage:{removeItem(){}},localStorage:{getItem:()=>''}});
+const front=vm.createContext({performance:{now:()=>0},sessionStorage:{removeItem(){}},localStorage:{getItem:()=>''}});
 vm.runInContext(frontScript.slice(0,frontScript.indexOf('function showSetup()')),front);
 let local=c.getData(other);
 const compact={response:'patch-v1'};
