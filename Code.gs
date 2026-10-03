@@ -166,7 +166,8 @@ function readTable_(name,includeRaw=false) {
 }
 function rows_(name) { return readTable_(name).display.slice(1).map(r => Object.fromEntries(TABLES[name].map((k,i)=>[k,r[i]??'']))); }
 function canEditLive_(live,me) {
-  return live.owner===me.id || !rows_('Members').some(m=>m.id===live.owner && m.active==='yes');
+  // Events are shared: every selected active member may edit them.
+  return !!me && me.active==='yes';
 }
 // A selected name is a convenience label, not authentication.
 // Anyone with the app URL can select any active member.
@@ -279,7 +280,7 @@ function saveData(memberId,action,payload,options) {
     if (action==='live') {
       const old=p.id?rows_('Lives').find(x=>x.id===p.id):null;
       if(p.id&&!old) throw new Error('ライブが見つかりません');
-      if(old && !canEditLive_(old,me)) throw new Error('ライブの編集は登録者のみ可能です');
+      if(old && !canEditLive_(old,me)) throw new Error('名前を選び直してください');
       if(old && String(p.version)!==old.version) throw new Error('他の更新がありました。再読込してください');
       const date=normalizeDate_(p.date,Number(japanToday_().slice(0,4))); if(!date) throw new Error('日付を確認してください');
       if(date<japanToday_()) throw new Error('終了済みのイベントは登録できません');
