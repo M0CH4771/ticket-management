@@ -286,6 +286,16 @@ function saveData(memberId,action,payload,options) {
       if(date<japanToday_()) throw new Error('終了済みのイベントは登録できません');
       const url=text_(p.sheetUrl,600,false); if(url&&!/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url)) throw new Error('スプレッドシートURLを確認してください');
       write_('Lives',{id:old?old.id:Utilities.getUuid(),title:text_(p.title,120,true),date,groups:JSON.stringify(validateGroups_(p.groups===undefined?readGroups_(old?.groups):p.groups)),purchaseUrl:purchaseUrl_(p.purchaseUrl===undefined?old?.purchaseUrl:p.purchaseUrl),lotteryDeadline:deadline_(p.lotteryDeadline===undefined?old?.lotteryDeadline:p.lotteryDeadline),requiredThrows:throws_(p.requiredThrows===undefined?old?.requiredThrows:p.requiredThrows),venue:text_(p.venue,120,false),sheetUrl:url,memo:text_(p.memo,500,false),owner:me.id,version:old?Number(old.version)+1:1},old);
+    } else if(action==='deleteLive') {
+      const live=rows_('Lives').find(x=>x.id===p.id);
+      if(!live) throw new Error('ライブが見つかりません');
+      if(!canEditLive_(live,me)) throw new Error('名前を選び直してください');
+      if(String(p.version)!==live.version) throw new Error('他の更新がありました。再読込してください');
+      prepareSave_();
+      const index=rows_('Lives').findIndex(row=>row.id===live.id);
+      sheet_('Lives').deleteRow(index+2);
+      invalidate_('Lives');
+      requestChanges.Lives={upsert:[],remove:[live.id]};
     } else {
       const live=rows_('Lives').find(x=>x.id===p.liveId);
       if(!live) throw new Error('ライブが見つかりません');
