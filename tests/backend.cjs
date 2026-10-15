@@ -173,6 +173,18 @@ assert.throws(()=>fast('ticket',{...ticket,status:'取引中'}),/他の更新/);
 assert.equal(JSON.stringify(local),stable);
 fast('deleteTicket',local.tickets.find(t=>t.liveId===id&&t.number==='Q2'));
 fast('live',{title:'新規差分',date:'2027-04-01',groups:['タグB']});
+const removable=fast('live',{title:'削除対象',date:'2027-05-01'}).changes.Lives.upsert[0];
+fast('attendance',{liveId:removable.id,status:'参戦'});
+fast('addTickets',{liveId:removable.id,numbers:['DEL1','DEL2'],status:'余り'});
+const removableLive=local.lives.find(l=>l.id===removable.id);
+const deletion=fast('deleteLive',{id:removable.id,version:removableLive.version,title:removableLive.title});
+assert.deepEqual(deletion.changes.Lives.remove,[removable.id]);
+assert.equal(deletion.changes.Attendance,undefined);
+assert.equal(deletion.changes.Tickets,undefined);
+assert.ok(!local.lives.some(l=>l.id===removable.id));
+assert.ok(local.attendance.some(a=>a.liveId===removable.id));
+assert.equal(local.tickets.filter(t=>t.liveId===removable.id).length,2);
+assert.throws(()=>c.saveData(other,'deleteLive',{id,title:'削除対象',version:removableLive.version},compact),/見つかりません/);
 const full=c.getData(other);
 for(const field of ['lives','tickets','attendance','groups'])assert.equal(JSON.stringify(local[field]),JSON.stringify(full[field]),field);
 assert.equal(front.applySaveResult(local,full),full); // Old GAS compatibility.
