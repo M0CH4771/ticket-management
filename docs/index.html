@@ -481,11 +481,7 @@ function operationKey(action,p){return action==='live'||action==='deleteLive'?'l
 function optimisticPatch(base,item){
   const p=item.payload,id='pending-'+item.id,version=String(Number(p.version||0)+1);
   let table,row,remove=[];
-  if(item.action==='deleteLive')return {kind:'patch-v1',changes:{
-    Lives:{upsert:[],remove:[p.id]},
-    Attendance:{upsert:[],remove:base.attendance.filter(a=>a.liveId===p.id).map(a=>a.id)},
-    Tickets:{upsert:[],remove:base.tickets.filter(t=>t.liveId===p.id).map(t=>t.id)}
-  }};
+  if(item.action==='deleteLive')return {kind:'patch-v1',changes:{Lives:{upsert:[],remove:[p.id]}}};
   if(item.action==='live'){table='Lives';const existingLive=p.id&&base.lives.find(l=>l.id===p.id);row={...p,id:p.id||id,owner:existingLive?.owner||base.me.id,version,groups:p.groups||[]};}
   else if(item.action==='attendance'){table='Attendance';const old=base.attendance.find(a=>a.liveId===p.liveId&&a.memberId===base.me.id);row={id:old?.id||id,liveId:p.liveId,memberId:base.me.id,status:p.status,version};}
   else if(item.action==='addTickets')return {kind:'patch-v1',changes:{Tickets:{upsert:p.entries.map((e,i)=>({...e,id:id+'-'+i,liveId:p.liveId,memberId:base.me.id,recipient:'',memo:'',version:'1'})),remove:[]}}};
