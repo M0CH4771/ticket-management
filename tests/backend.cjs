@@ -177,6 +177,10 @@ const removable=fast('live',{title:'削除対象',date:'2027-05-01'}).changes.Li
 fast('attendance',{liveId:removable.id,status:'参戦'});
 fast('addTickets',{liveId:removable.id,numbers:['DEL1','DEL2'],status:'余り'});
 const removableLive=local.lives.find(l=>l.id===removable.id);
+const preview=front.applySaveResult(local,front.optimisticPatch(local,{id:'pending-delete',action:'deleteLive',payload:{id:removable.id,title:removableLive.title}}));
+assert.ok(!preview.lives.some(l=>l.id===removable.id));
+assert.ok(preview.attendance.some(a=>a.liveId===removable.id));
+assert.equal(preview.tickets.filter(t=>t.liveId===removable.id).length,2);
 const deletion=fast('deleteLive',{id:removable.id,version:removableLive.version,title:removableLive.title});
 assert.deepEqual(deletion.changes.Lives.remove,[removable.id]);
 assert.equal(deletion.changes.Attendance,undefined);
