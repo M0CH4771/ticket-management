@@ -2,14 +2,14 @@ const TABLES = {
   Lives: ['id','title','date','venue','sheetUrl','memo','owner','version','lotteryDeadline','requiredThrows','purchaseUrl','groups'],
   Members: ['id','name','tokenHash','active'],
   Attendance: ['id','liveId','memberId','status','version'],
-  Tickets: ['id','liveId','memberId','number','status','recipient','memo','version'],
+  Tickets: ['id','liveId','memberId','number','status','recipient','memo','version','ticketUrl'],
 };
 // Column positions and internal keys remain stable; only sheet labels are translated.
 const HEADERS_JA = {
   Lives: ['イベントID（自動）','イベント名','開催日','会場','関連スプシURL','メモ','登録者ID','更新番号（自動）','抽選締切','必要投げ数（1人あたり）','チケット購入URL','出演グループ'],
   Members: ['メンバーID（自動）','名前','旧認証情報（使用しません）','利用状態（yes / no）'],
   Attendance: ['参戦予定ID','イベントID','メンバーID','参戦状況','更新番号'],
-  Tickets: ['チケットID','イベントID','メンバーID','整理番号','チケット状況','譲り先','メモ','更新番号'],
+  Tickets: ['チケットID','イベントID','メンバーID','整理番号','チケット状況','譲り先','メモ','更新番号','本人用チケットURL'],
 };
 function doGet(e) {
   // Connect immediately; initialization and maintenance happen in the data request.
@@ -34,7 +34,7 @@ function setup_() {
       s.getRange(1,1,1,TABLES[name].length).setFontWeight('bold').setBackground('#dde8ff');
     });
     p.setProperty('SHEET_ID',ss.getId());
-    p.setProperty('SCHEMA_VERSION','japanese-headers-v3');
+    p.setProperty('SCHEMA_VERSION','japanese-headers-v4');
     console.log('管理スプレッドシート: '+ss.getUrl());
   } finally { lock.releaseLock(); }
 }
@@ -42,20 +42,20 @@ function ensureReady_(maintenance=true) {
   resetRequest_();
   const p=PropertiesService.getScriptProperties();
   if(!p.getProperty('SHEET_ID')) setup_();
-  if(!maintenance && p.getProperty('SCHEMA_VERSION')==='japanese-headers-v3') return;
+  if(!maintenance && p.getProperty('SCHEMA_VERSION')==='japanese-headers-v4') return;
   const lock=LockService.getScriptLock(); lock.waitLock(10000);
   try {
-    if(p.getProperty('SCHEMA_VERSION')!=='japanese-headers-v3') {
+    if(p.getProperty('SCHEMA_VERSION')!=='japanese-headers-v4') {
       // Validate every table before changing any header. Preserve all existing rows.
       Object.keys(TABLES).forEach(name=>{
         const headers=sheet_(name).getDataRange().getDisplayValues()[0]||[];
         TABLES[name].forEach((key,i)=>{
-          if(headers[i]!==key && headers[i]!==HEADERS_JA[name][i] && !(name==='Lives' && i>=8 && !headers[i]))
+          if(headers[i]!==key && headers[i]!==HEADERS_JA[name][i] && !((name==='Lives' && i>=8 || name==='Tickets' && i===8) && !headers[i]))
             throw new Error(name+'の列の順番を確認してください');
         });
       });
       Object.keys(TABLES).forEach(name=>sheet_(name).getRange(1,1,1,TABLES[name].length).setValues([HEADERS_JA[name]]).setFontWeight('bold').setBackground('#dde8ff'));
-      p.setProperty('SCHEMA_VERSION','japanese-headers-v3');
+      p.setProperty('SCHEMA_VERSION','japanese-headers-v4');
     }
     if(maintenance) {normalizeSheetDates_();fillSheetIds_();deletePastEvents_();}
     SpreadsheetApp.flush();
@@ -319,7 +319,7 @@ function saveData(memberId,action,payload,options) {
         const existing=rows_('Tickets').filter(t=>t.liveId===p.liveId).map(t=>t.number.toUpperCase());
         const named=nums.filter(Boolean).map(x=>x.toUpperCase());
         if(new Set(named).size!==named.length||named.some(n=>existing.includes(n))) throw new Error('このライブに同じ整理番号が登録されています。券種が異なる場合は「VIP-A12」などにしてください');
-        const added=entries.map(({number,status})=>({id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,number,status,recipient:'',memo:'',version:1}));
+        const added=entries.map(({number,status})=>({id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,number,status,recipient:'',memo:'',version:1,ticketUrl:''}));
         const values=added.map(row=>TABLES.Tickets.map(k=>safe_(row[k])));
         prepareSave_();
         const s=sheet_('Tickets');s.getRange(s.getLastRow()+1,1,values.length,TABLES.Tickets.length).setValues(values);invalidate_('Tickets');added.forEach(row=>recordChange_('Tickets',row));
@@ -332,7 +332,7 @@ function saveData(memberId,action,payload,options) {
           const status=enum_(p.status,['未発券','自分用','余り','取引中','捌けた']);
           const number=text_(p.number,30,status!=='未発券');
           if(number&&rows_('Tickets').some(t=>t.liveId===old.liveId&&t.id!==old.id&&t.number.toUpperCase()===number.toUpperCase())) throw new Error('同じ整理番号が登録されています');
-          write_('Tickets',{...old,number,status,recipient:text_(p.recipient,80,false),memo:text_(p.memo,500,false),version:Number(old.version)+1},old);
+          write_('Tickets',{...old,number,status,recipient:text_(p.recipient,80,false),memo:text_(p.memo,500,false),version:Number(old.version)+1,ticketUrl:purchaseUrl_(p.ticketUrl)},old);
         }
       } else throw new Error('操作が無効です');
     }
