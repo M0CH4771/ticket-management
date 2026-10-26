@@ -74,7 +74,7 @@
 .entry-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .entry-label{font-size:14px}.entry-heading button{min-height:44px;padding:6px 12px;font-size:13px}
 .entry-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
-.entry-fields label{margin:8px 0 6px}.entry-fields select{padding-left:8px;padding-right:4px}
+.entry-fields label{margin:8px 0 6px}.entry-fields select{padding-left:8px;padding-right:4px}.entry-url{grid-column:1/-1}.entry-heading span{display:flex;gap:5px}.entry-heading [data-copy-entry]{font-size:12px;min-height:40px;padding:5px 8px}.copy-ticket-details{margin:10px 0;min-height:44px;font-size:13px}
 .batch-add{width:100%;margin-bottom:12px}
 
 .sync-panel{border:1px solid #dfb960;background:#fff9e9;border-radius:12px;padding:14px;margin-bottom:18px;font-size:14px;overflow-wrap:anywhere}
@@ -780,7 +780,7 @@ function addForm(){
   if(busy||!managerLiveId)return;
   managerMode='add';const liveId=managerLiveId;
   modal('自分の番号を登録',`<p class="muted">1枚ずつ番号と捌き状況を選び、まとめて登録できます。</p><div id="ticket-entry-rows"></div><div id="duplicate-warning" class="duplicate-warning" role="status"></div><button type="button" id="append-ticket" class="batch-add">＋ 1枚追加</button><details><summary>番号をまとめて貼り付ける</summary><label for="batch-numbers">整理番号</label><textarea id="batch-numbers" placeholder="A12\nA35\nA86"></textarea><p class="muted form-hint">改行・カンマ・空白で区切って入力。追加後に1枚ずつ状況を選べます。</p><button type="button" id="import-numbers">入力欄に追加</button></details><p id="number-preview" class="preview-count" aria-live="polite"></p><p class="muted form-hint">最大50枚。空欄は登録されません。</p>`,()=>{
-    const entries=[...$('ticket-entry-rows').children].map(row=>({number:row.querySelector('input').value.normalize('NFKC').trim(),status:row.querySelector('select').value})).filter(e=>e.number);
+    const entries=[...$('ticket-entry-rows').children].map(row=>({number:row.querySelector('[data-entry-number]').value.normalize('NFKC').trim(),status:row.querySelector('select').value,ticketUrl:row.querySelector('[data-entry-url]').value.trim()})).filter(e=>e.number);
     if(!entries.length){notice('整理番号を1つ以上入力してください');return}
     const named=entries.map(e=>e.number.toUpperCase()).filter(Boolean);
     if(new Set(named).size!==named.length){notice('同じ整理番号が含まれています。入力を確認してください');return}
@@ -797,18 +797,19 @@ function addForm(){
       row.querySelector('button').disabled=rows.length===1;
     });
     $('append-ticket').disabled=rows.length>=50;
-    const count=rows.filter(row=>row.querySelector('input').value.trim()).length;
+    rows.forEach(row=>{const number=row.querySelector('[data-entry-number]').value.trim(),url=row.querySelector('[data-entry-url]').value.trim();row.querySelector('[data-copy-entry]').disabled=!(number&&url)});
+    const count=rows.filter(row=>row.querySelector('[data-entry-number]').value.trim()).length;
     $('number-preview').textContent=count+'枚を登録・空欄はスキップ';
     $('submit-save').textContent=count+'枚を登録';$('submit-save').disabled=!count;
     duplicateWarning(liveId,rows.map(row=>row.querySelector('input').value));
   };
   const append=(number='')=>{
     const id=++serial;
-    $('ticket-entry-rows').insertAdjacentHTML('beforeend',`<div class="ticket-entry"><div class="entry-heading"><strong class="entry-label"></strong><button type="button" class="remove-entry" aria-label="この入力行を削除">削除</button></div><div class="entry-fields"><div><label for="entry-number-${id}">整理番号</label><input id="entry-number-${id}" value="${esc(number)}" maxlength="30" placeholder="例：A12" autocapitalize="characters" spellcheck="false"></div><div><label for="entry-status-${id}">捌き状況</label><select id="entry-status-${id}">${opts(statuses,'余り')}</select></div></div></div>`);
+    $('ticket-entry-rows').insertAdjacentHTML('beforeend',`<div class="ticket-entry"><div class="entry-heading"><strong class="entry-label"></strong><span><button type="button" data-copy-entry="${id}" disabled>情報をコピー</button> <button type="button" class="remove-entry" aria-label="この入力行を削除">削除</button></span></div><div class="entry-fields"><div><label for="entry-number-${id}">整理番号</label><input id="entry-number-${id}" data-entry-number value="${esc(number)}" maxlength="30" placeholder="例：A12" autocapitalize="characters" spellcheck="false"></div><div><label for="entry-status-${id}">捌き状況</label><select id="entry-status-${id}">${opts(statuses,'余り')}</select></div><div class="entry-url"><label for="entry-url-${id}">チケットURL（任意）</label><input id="entry-url-${id}" data-entry-url type="url" maxlength="2000" placeholder="https://"></div></div></div>`);
     update();
   };
   $('ticket-entry-rows').onchange=update;$('ticket-entry-rows').oninput=update;
-  $('ticket-entry-rows').onclick=e=>{if(e.target.closest('.remove-entry')){e.target.closest('.ticket-entry').remove();modalDirty=true;update()}};
+  $('ticket-entry-rows').onclick=e=>{const copy=e.target.closest('[data-copy-entry]');if(copy){const row=copy.closest('.ticket-entry');copyTicketShare(liveId,row.querySelector('[data-entry-number]').value,row.querySelector('[data-entry-url]').value).then(ok=>{if(ok)copy.textContent='コピーしました'});return}if(e.target.closest('.remove-entry')){e.target.closest('.ticket-entry').remove();modalDirty=true;update()}};
   $('append-ticket').onclick=()=>{if($('ticket-entry-rows').children.length<50){append();modalDirty=true;$('ticket-entry-rows').lastElementChild.querySelector('input').focus()}};
   $('import-numbers').onclick=()=>{
     const numbers=parseNumbers($('batch-numbers').value);
@@ -823,8 +824,10 @@ function addForm(){
   for(let i=0;i<3;i++)append();
 }
 
+function ticketShareText(liveId,number,url){const live=data.lives.find(l=>l.id===liveId);return ['日付：'+(live?eventDateLabel(live.date):''),'イベント名：'+(live?.title||''),'チケット番号：'+String(number||'').trim(),'URL：'+String(url||'').trim()].join('\n')}
+async function copyTicketShare(liveId,number,url){const text=ticketShareText(liveId,number,url);try{await navigator.clipboard.writeText(text);notice('チケット情報をコピーしました');return true}catch(e){modal('チケット情報をコピー',`<p class="muted">下の内容を選択してコピーしてください。</p><textarea id="ticket-share-copy" readonly rows="5">${esc(text)}</textarea>`,()=>{});$('submit-save').hidden=true;$('ticket-share-copy').focus();$('ticket-share-copy').select()}}
 async function copyTicketUrl(ticketId){const t=data.tickets.find(x=>x.id===ticketId&&x.memberId===data.me.id);if(!t?.ticketUrl)return;try{await navigator.clipboard.writeText(t.ticketUrl);notice('チケットURLをコピーしました')}catch(e){modal('本人用チケットURL',`<p class="muted">URLを選択してコピーしてください。</p><textarea id="ticket-url-copy" readonly rows="3">${esc(t.ticketUrl)}</textarea>`,()=>{});$('submit-save').hidden=true;$('ticket-url-copy').focus();$('ticket-url-copy').select()}}
-function ticketForm(t){if(busy||!t||t.memberId!==data.me.id||ticketPending(t))return;managerMode='edit';modal('チケットを編集',field('整理番号','number',t.number)+`<div id="duplicate-warning" class="duplicate-warning" role="status"></div><label for="status">状態</label><select id="status" name="status" required>${ticketStatusOptions(t.status,true)}</select>`+field('譲り先（任意）','recipient',t.recipient)+`<label for="memo">この番号のメモ</label><textarea id="memo" name="memo" maxlength="500" placeholder="例：〇〇さんに譲渡、受け渡し方法など">${esc(t.memo||'')}</textarea>`+field('本人用チケットURL（任意）','ticketUrl',t.ticketUrl,'url')+`<p class="muted form-hint">名前選択は本人確認ではありません。他の人も名前を切り替えるとこのURLを見られます。</p><button class="danger" type="button" id="delete" style="margin-top:18px">このチケットを削除</button>`,p=>{if(normalizedNumber(p.number)!==normalizedNumber(t.number)&&!duplicateWarning(t.liveId,[p.number],t.id)){notice('登録済み番号を確認してください');return}save('ticket',{...p,id:t.id,liveId:t.liveId,version:t.version})});$('f-number').oninput=()=>duplicateWarning(t.liveId,normalizedNumber($('f-number').value)===normalizedNumber(t.number)?[]:[$('f-number').value],t.id);$('delete').onclick=()=>{if(confirm('このチケットを削除しますか？'))save('deleteTicket',{id:t.id,liveId:t.liveId,version:t.version})}}
+function ticketForm(t){if(busy||!t||t.memberId!==data.me.id||ticketPending(t))return;managerMode='edit';modal('チケットを編集',field('整理番号','number',t.number)+`<div id="duplicate-warning" class="duplicate-warning" role="status"></div><label for="status">状態</label><select id="status" name="status" required>${ticketStatusOptions(t.status,true)}</select>`+field('譲り先（任意）','recipient',t.recipient)+`<label for="memo">この番号のメモ</label><textarea id="memo" name="memo" maxlength="500" placeholder="例：〇〇さんに譲渡、受け渡し方法など">${esc(t.memo||'')}</textarea>`+field('本人用チケットURL（任意）','ticketUrl',t.ticketUrl,'url')+`<button type="button" id="copy-ticket-details" class="copy-ticket-details">日付・イベント名・番号・URLをコピー</button><p class="muted form-hint">名前選択は本人確認ではありません。他の人も名前を切り替えるとこのURLを見られます。</p><button class="danger" type="button" id="delete" style="margin-top:18px">このチケットを削除</button>`,p=>{if(normalizedNumber(p.number)!==normalizedNumber(t.number)&&!duplicateWarning(t.liveId,[p.number],t.id)){notice('登録済み番号を確認してください');return}save('ticket',{...p,id:t.id,liveId:t.liveId,version:t.version})});const updateCopy=()=>{$('copy-ticket-details').disabled=!($('f-number').value.trim()&&$('f-ticketUrl').value.trim())};$('copy-ticket-details').onclick=async()=>{if(await copyTicketShare(t.liveId,$('f-number').value,$('f-ticketUrl').value))$('copy-ticket-details').textContent='コピーしました'};$('f-number').oninput=()=>{duplicateWarning(t.liveId,normalizedNumber($('f-number').value)===normalizedNumber(t.number)?[]:[$('f-number').value],t.id);updateCopy()};$('f-ticketUrl').oninput=updateCopy;updateCopy();$('delete').onclick=()=>{if(confirm('このチケットを削除しますか？'))save('deleteTicket',{id:t.id,liveId:t.liveId,version:t.version})}}
 function showSetup(){ $('account').textContent='';$('app').innerHTML='<div class="card login"><span class="date">Ticket Management</span><h1 style="margin-top:12px">初期設定を準備中です</h1><p>イベント・チケットの保存先を接続すると利用できます。</p><p class="muted">幹事の方は設定手順に沿ってGASを公開し、そのURLを設定してください。メンバーの方の設定は不要です。</p><a href="https://github.com/M0CH4771/ticket-management#最初の設定" target="_blank" rel="noopener">設定手順を見る ↗</a></div>';finishStartup()}
 window.addEventListener('popstate',handleHistory);
 history.replaceState({ticketView:'home'},'',location.pathname+location.search);
