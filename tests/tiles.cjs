@@ -16,7 +16,8 @@ assert.ok(!c.safeLink('javascript:alert(1)','チケットURL').includes('href=')
 assert.ok(c.eventTile({...l,title:'<script>bad</script>'},[],'2026-09-19').includes('&lt;script&gt;'));
 assert.ok(c.eventTile({...l,groups:['グループA','<script>']},[],'2026-09-19').includes('グループA'));
 assert.ok(c.eventTile({...l,groups:['<script>']},[],'2026-09-19').includes('&lt;script&gt;'));
-console.log('PASS: priority ordering, Japan midnight, year rollover, cutoff day/next day tile content, remaining count, unset cutoff, safe links and escaping');
+vm.runInContext("data={lives:[{id:'copy-event',date:'2026-09-19',title:'コピー対象'}]};",c);const copied=c.ticketShareText('copy-event','A12','https://example.com/ticket');assert.ok(copied.includes('日付：'));assert.ok(copied.includes('イベント名：コピー対象'));assert.ok(copied.includes('チケット番号：A12'));assert.ok(copied.includes('URL：https://example.com/ticket'));
+console.log('PASS: priority ordering, Japan midnight, year rollover, cutoff day/next day tile content, remaining count, unset cutoff, safe links, escaping and formatted ticket copy');
 
 assert.ok(c.eventTile({...l,owner:'me'},[],'2026-09-19').includes('data-edit-live='));
 assert.ok(c.eventTile({...l,owner:'bad-import-id'},[],'2026-09-19').includes('data-edit-live='));
