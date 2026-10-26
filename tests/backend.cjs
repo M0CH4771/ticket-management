@@ -200,10 +200,10 @@ assert.ok(tables.Lives.r.some(r=>r[1]==='保存時には削除しない'));
 c.getData(other);assert.ok(!tables.Lives.r.some(r=>r[1]==='保存時には削除しない'));
 console.log('PASS: compact save receipt/real UI merge for all actions, old GAS compatibility, no maintenance during saves, edit reads 2 tables/0 raw values/1 lock/1 flush');
 // Mixed statuses are validated as a batch before the single sheet write.
-const mixed=[{number:'Ｍ101',status:'自分用'},{number:'M102',status:'余り'},{number:'M103',status:'取引中'},{number:'M104',status:'捌けた'},{number:'ignored',status:'未発券'}];
+const mixed=[{number:'Ｍ101',status:'自分用',ticketUrl:'https://example.com/M101'},{number:'M102',status:'余り'},{number:'M103',status:'取引中'},{number:'M104',status:'捌けた'},{number:'ignored',status:'未発券'}];
 let mixedResult=c.saveData(other,'addTickets',{liveId:id,entries:mixed},compact);
 assert.equal(mixedResult.changes.Tickets.upsert.map(t=>t.status).join(','),'自分用,余り,取引中,捌けた,未発券');
-assert.equal(mixedResult.changes.Tickets.upsert[0].number,'M101');
+assert.equal(mixedResult.changes.Tickets.upsert[0].number,'M101');assert.equal(mixedResult.changes.Tickets.upsert[0].ticketUrl,'https://example.com/M101');
 assert.equal(mixedResult.changes.Tickets.upsert[4].number,'');
 for(const entries of [[],Array(51).fill({number:'',status:'未発券'}),[{number:'M201',status:'余り'},{number:'',status:'捌けた'}],[{number:'M201',status:'余り'},{number:'M101',status:'自分用'}],[{number:'X1',status:'余り'},{number:'ｘ１',status:'取引中'}],[{number:'M201',status:'不正'}],[null]]){
   const before=JSON.stringify(tables.Tickets.r);
