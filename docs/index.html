@@ -484,8 +484,8 @@ function optimisticPatch(base,item){
   let table,row,remove=[];
   if(item.action==='deleteLive')return {kind:'patch-v1',changes:{Lives:{upsert:[],remove:[p.id]}}};
   if(item.action==='live'){table='Lives';const existingLive=p.id&&base.lives.find(l=>l.id===p.id);row={...p,id:p.id||id,owner:existingLive?.owner||base.me.id,version,groups:p.groups||[]};}
-  else if(item.action==='attendance'){table='Attendance';const old=base.attendance.find(a=>a.liveId===p.liveId&&a.memberId===base.me.id);row={id:old?.id||id,liveId:p.liveId,memberId:base.me.id,status:p.status,applied:old?.applied||'',version};}
-  else if(item.action==='application'){table='Attendance';const old=base.attendance.find(a=>a.liveId===p.liveId&&a.memberId===base.me.id);row={id:old?.id||id,liveId:p.liveId,memberId:base.me.id,status:old?.status||'',applied:p.applied==='未確認'?'':p.applied,version};}
+  else if(item.action==='attendance'){table='Attendance';const old=base.attendance.find(a=>a.liveId===p.liveId&&a.memberId===base.me.id);const applied=p.status==='不参加'?'申込不要':old?.status==='不参加'?'':old?.applied||'';row={id:old?.id||id,liveId:p.liveId,memberId:base.me.id,status:p.status,applied,version};}
+  else if(item.action==='application'){table='Attendance';const old=base.attendance.find(a=>a.liveId===p.liveId&&a.memberId===base.me.id);const applied=old?.status==='不参加'?'申込不要':p.applied==='未確認'?'':p.applied;row={id:old?.id||id,liveId:p.liveId,memberId:base.me.id,status:old?.status||'',applied,version};}
   else if(item.action==='addTickets')return {kind:'patch-v1',changes:{Tickets:{upsert:p.entries.map((e,i)=>({...e,id:id+'-'+i,liveId:p.liveId,memberId:base.me.id,recipient:'',memo:'',version:'1'})),remove:[]}}};
   else {table='Tickets';if(item.action==='deleteTicket')remove=[p.id];else row={...base.tickets.find(t=>t.id===p.id),...p,version};}
   return {kind:'patch-v1',changes:{[table]:{upsert:row?[row]:[],remove}}};
@@ -642,9 +642,11 @@ async function copySurplus(l){
 function eventTile(l,tickets,today){
   const after=Boolean(l.lotteryDeadline)&&today>l.lotteryDeadline,rank=eventRank(l,today);
   const labels={'-1':'昨日抽選締切',0:'本日開催',1:'本日抽選締切',2:'明日抽選締切'};
-  const mine=(data.attendance||[]).find(a=>a.liveId===l.id&&a.memberId===data.me.id)?.status||'未回答';
-  const application=data.attendance.find(a=>a.liveId===l.id&&a.memberId===data.me.id)?.applied||'未確認';
-  const applicationControl=l.lotteryDeadline===today?'<div class="my-attendance"><label for="application-'+esc(l.id)+'">本日の申込状況</label><select id="application-'+esc(l.id)+'" data-application="'+esc(l.id)+'"><option value="未確認" '+(application==='未確認'?'selected':'')+'>未確認</option><option value="申込済み" '+(application==='申込済み'?'selected':'')+'>申込済み</option><option value="申込不要" '+(application==='申込不要'?'selected':'')+'>申込不要</option></select></div>':'';
+  const ownRecord=(data.attendance||[]).find(a=>a.liveId===l.id&&a.memberId===data.me.id);
+  const mine=ownRecord?.status||'未回答';
+  const notAttending=mine==='不参加';
+  const application=notAttending?'申込不要':ownRecord?.applied||'未確認';
+  const applicationControl=l.lotteryDeadline===today?'<div class="my-attendance"><label for="application-'+esc(l.id)+'">本日の申込状況</label><select id="application-'+esc(l.id)+'" data-application="'+esc(l.id)+'" '+(notAttending?'disabled':'')+'><option value="未確認" '+(application==='未確認'?'selected':'')+'>未確認</option><option value="申込済み" '+(application==='申込済み'?'selected':'')+'>申込済み</option><option value="申込不要" '+(application==='申込不要'?'selected':'')+'>申込不要</option></select></div>':'';
   const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline||'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}${!l.lotteryDeadline?`<dl class="undated-surplus"><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:''}`;
   return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''}" data-event="${esc(l.id)}">
     <div class="event-overview"><div class="event-dateline"><time class="date" datetime="${esc(l.date)}" title="${esc(l.date)}">${esc(eventDateLabel(l.date))}</time>${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}</div>
@@ -671,7 +673,10 @@ function updateSaveView(action){
   document.querySelectorAll('[data-event]').forEach(card=>{
     const id=card.dataset.event,live=data.lives.find(l=>l.id===id);if(!live)return;
     const select=card.querySelector('[data-attendance]');
-    if(select)select.value=data.attendance.find(a=>a.liveId===id&&a.memberId===data.me.id)?.status||'';
+    const ownRecord=data.attendance.find(a=>a.liveId===id&&a.memberId===data.me.id);
+    if(select)select.value=ownRecord?.status||'';
+    const application=card.querySelector('[data-application]');
+    if(application){const notAttending=ownRecord?.status==='不参加';application.value=notAttending?'申込不要':ownRecord?.applied||'未確認';application.disabled=notAttending;}
     const details=card.querySelector('.tile-attendance');
     if(details){const template=document.createElement('template');template.innerHTML=attendanceDropdown(live);const fresh=template.content.firstElementChild;if(details.innerHTML!==fresh.innerHTML)details.innerHTML=fresh.innerHTML}
   });
