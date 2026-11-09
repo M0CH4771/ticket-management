@@ -1,0 +1,20 @@
+# Optional: deploy from the command line with `npx wrangler deploy` (run inside api/).
+# The Cloudflare dashboard works too — see README「Cloudflareへの移行」.
+name = "ticket-management-api"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ticket-management"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+ALLOWED_ORIGINS = "https://m0ch4771.github.io"
+# FIREBASE_CONFIG = '{"apiKey":"...","projectId":"...","appId":"...","messagingSenderId":"..."}'
+# ADMIN_EMAILS = "you@example.com"
+# PUSH_VAPID_PUBLIC_KEY = "..."
+# Secrets (set with `npx wrangler secret put NAME`): LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN, PUSH_SERVICE_ACCOUNT

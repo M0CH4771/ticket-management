@@ -1,8 +1,59 @@
 # Ticket Management — イベント・チケット管理
 
-GitHub Pagesで画面を公開し、GAS経由でスプシに保存します。Googleアカウントでログインして使います。
+GitHub Pagesで画面を公開し、Googleアカウントでログインして使います。データの保存先は次の2通りです。
 
-## 最初の設定
+- **Cloudflare版（推奨・無料）**：Cloudflare Workers ＋ D1（データベース）。スプレッドシートを使わず、1回の通信が0.1〜0.3秒程度です。メンバーはアプリの「メンバー管理」で登録します。手順は下の「Cloudflareへの移行」。
+- **GAS版（旧構成）**：Google Apps Script ＋ スプレッドシート。`docs/config.js` に `apiUrl` がなく `gasUrl` だけ設定されている間はこちらで動きます。
+
+## Cloudflareへの移行
+
+すべてCloudflareの無料プラン（クレジットカード登録不要）の範囲で動きます。少人数のグループなら、1日あたりのリクエスト数・データベースの読み書き件数の上限には大きく余裕があります。
+
+### 1. データベース（D1）を作る
+
+[Cloudflareダッシュボード](https://dash.cloudflare.com/)の **Storage & Databases → D1 SQL Database → Create** で、名前を `ticket-management` にして作成します。表は初回アクセス時に自動で作られるので、SQLの実行は不要です。
+
+### 2. Workerにコードを貼り付ける
+
+**Workers & Pages** で、LINE連携に使っている既存のWorkerを開きます（WebhookのURLを変えずに済みます）。ない場合は **Create → Worker** で新しく作ります。**Edit code** を開き、[api/worker.js](api/worker.js) の全文に置き換えて **Deploy** します。
+
+### 3. 設定を追加する（Settings）
+
+| 種類 | 名前 | 値 |
+|---|---|---|
+| Bindings → D1 database | `DB` | 手順1のデータベース |
+| Variables（テキスト） | `FIREBASE_CONFIG` | GASのスクリプトプロパティ `FIREBASE_AUTH_CONFIG` と同じJSON |
+| Variables（テキスト） | `ADMIN_EMAILS` | 管理者のGoogleアカウント（複数はカンマ区切り） |
+| Variables（テキスト） | `ALLOWED_ORIGINS` | `https://m0ch4771.github.io` |
+| Secrets | `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` | LINE通知を使う場合。LINE Developersの値 |
+| Variables / Secrets | `PUSH_VAPID_PUBLIC_KEY` / `PUSH_SERVICE_ACCOUNT` | Web通知を使う場合。GASのスクリプトプロパティと同じ値（後者はSecret） |
+| Triggers → Cron Triggers | — | `*/5 * * * *`（締切通知・終了イベントのアーカイブ） |
+
+新しいWorkerを作った場合は、LINE DevelopersのWebhook URLを新しいWorkerのURLに変更します。コマンドラインで設定したい場合は [api/wrangler.toml](api/wrangler.toml) を使えます。
+
+### 4. 画面の接続先を切り替えて、データを移行する
+
+1. GASの `Code.gs` を最新版に差し替えて保存し、エディタで **`exportForMigration`** を選んで実行します。Googleドライブに `ticket-management-export.json` が作られるので、ダウンロードします。
+2. [docs/config.js](docs/config.js) に WorkerのURLを `apiUrl` として追加します（`gasUrl` は残してかまいません。`apiUrl` が優先されます）。
+   ```js
+   window.LIVE_POCKET_CONFIG = {
+     apiUrl: "https://ticket-management-api.<あなたのサブドメイン>.workers.dev",
+     gasUrl: "…（そのまま）…"
+   };
+   ```
+3. サイトを開き、`ADMIN_EMAILS` のアカウントでログインします（最初の1回で自動的に管理者として登録されます）。
+4. 右上のアカウントメニュー → **メンバー管理** → 「スプレッドシートからデータを移行」で、ダウンロードしたファイルを選んで「移行する」を押します。イベント・参戦予定・チケット・メンバー・LINE配信設定・通知登録がそのまま移ります。
+5. 移行が済んだら、GASエディタの **トリガー** 画面で `sendDeadlinePush_` と `dailyCleanup` のトリガーを削除してください（残すとLINE通知が二重に届きます）。
+
+手順2〜4の間に他のメンバーが登録した内容は移行されません。メンバーに少しの間だけ操作を控えてもらってから切り替えてください。
+
+### Cloudflare版での違い
+
+- メンバーの追加・権限変更・利用停止は **アカウントメニュー → メンバー管理** で行います（管理者のみ）。スプレッドシートへの直接入力はありません。
+- 保存は1つのトランザクションで行われ、全部保存されるか、まったく保存されないかのどちらかです。
+- 終了したイベントのアーカイブと、30日を過ぎた保存受付の記録の削除は、5分おきのCron Triggerで行います。
+
+## 最初の設定（GAS版・旧構成）
 
 **管理者が初期設定とメンバーのGoogleアカウント登録を行います。**
 
@@ -138,7 +189,9 @@ Googleログイン後、Membersシートに登録したメールアドレスと�
 
 GASでは、名前が `_` で終わらない関数はすべて、公開URLのページから `google.script.run` で呼び出せます。Bridge.htmlの許可リストは補助的な制限にすぎないため、公開関数は必ず関数の中でログインを確認します。エディタから実行する `installDailyCleanup` などは実行者がオーナー本人かを確認し、トリガー用の `dailyCleanup` はこのプロジェクトのトリガーからの呼び出しだけを受け付けます。
 
-すべてのテストは `for t in tests/*.cjs; do node "$t" || break; done` で実行できます（Node.js 18以上）。
+すべてのテストは `for t in tests/*.cjs tests/*.mjs; do node "$t" || break; done` で実行できます（Node.js 22.5以上。Cloudflare版のテストは `node:sqlite` でD1を再現します）。
+
+- `node tests/worker.mjs`：Cloudflare版のAPI。CORS、FirebaseのIDトークン検証（署名・対象プロジェクト・有効期限・メール確認）、管理者の自動登録とメンバー管理、イベント・参戦予定・チケットの保存と同時編集の衝突、本人以外へのチケット情報の非公開、保存受付の再送、アーカイブ、LINE Webhook・締切通知・Web通知、スプレッドシートからの移行。
 
 - `node tests/backend.cjs`：Googleログイン（IDトークン検証・未登録拒否・他メンバーへのなりすまし拒否）、管理者限定のメンバー登録、利用状態の扱い、本人以外へのチケットURL・メモ・譲り先の非公開、グループ・イベント・チケット、旧版データ移行、アーカイブ、保存受付の再送・整理の確認。
 - `node tests/tiles.cjs`：タイル切替・日本時間・優先順位・タグのエスケープの確認。
@@ -151,6 +204,9 @@ GASでは、名前が `_` で終わらない関数はすべて、公開URLのペ
 上記のテストは模擬データで実施しています。Googleの実スプシ接続、スマホ実機の描画・操作、公開は未確認です。
 
 ## 通信方式
+
+Cloudflare版では、画面から `https://<Worker>/api/rpc` へHTTPSでPOSTし、FirebaseのIDトークンを `Authorization` ヘッダーで送ります。Workerは毎回トークンの署名をGoogleの公開鍵で検証し、登録済みメンバーか照合します。許可するサイトは `ALLOWED_ORIGINS` で限定します。以下はGAS版の方式です。
+
 
 GASの非表示iframeを介して読み書きします。Pages側はGoogleのorigin・接続ごとのランダムchannel・応答元ウィンドウを検証し、GAS側はPagesのorigin・親ウィンドウ・許可済み操作名を検証します。認証ではFirebase IDトークンを検証し、Membersシートのメールアドレスと照合します。タイムアウト時は自動再送せず、登録済みか再読込して確認します。
 

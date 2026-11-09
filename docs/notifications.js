@@ -3,7 +3,7 @@ let dialog,working=false,settings,clientPromise;
 const read=()=>{try{return JSON.parse(localStorage.getItem(storageKey)||'null')}catch{return null}};
 const write=value=>localStorage.setItem(storageKey,JSON.stringify(value));
 const rpc=(...args)=>window.LivePocketTransport.call(...args);
-const endpoint=()=>window.LIVE_POCKET_CONFIG?.gasUrl;
+const endpoint=()=>window.LIVE_POCKET_CONFIG?.apiUrl||window.LIVE_POCKET_CONFIG?.gasUrl;
 const saved=()=>{const state=read();return state?.endpoint===endpoint()?state:null};
 function timed(promise,ms=20000){let timer;return Promise.race([promise,new Promise((_,reject)=>timer=setTimeout(()=>reject(new Error('接続に時間がかかっています。もう一度お試しください。')),ms))]).finally(()=>clearTimeout(timer))}
 function status(message){if(dialog)dialog.querySelector('[role=status]').textContent=message}

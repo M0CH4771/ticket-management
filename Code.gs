@@ -536,3 +536,31 @@ function saveData(idToken,memberId,action,payload,options) {
     return snapshot_(me);
   } finally { lock.releaseLock(); }
 }
+
+// Migration to Cloudflare: run once from the Apps Script editor. Writes every event,
+// member, attendance and ticket row plus LINE settings and push devices to a JSON file
+// in your Google Drive. Upload that file from the app's 管理画面 → データ移行.
+function exportForMigration() {
+  requireEditor_();
+  resetRequest_();
+  ensureSchema_();
+  const p=PropertiesService.getScriptProperties();
+  const props=p.getProperties();
+  const settings={};
+  [['LINE_DAY_TIME','line_day_time'],['LINE_NIGHT_TIME','line_night_time'],['LINE_DAY_MODE','line_day_mode'],['LINE_NIGHT_MODE','line_night_mode'],['LINE_GROUP_ID','line_group_id']]
+    .forEach(([from,to])=>{if(props[from])settings[to]=String(props[from]).trim();});
+  const devices=Object.keys(props).filter(k=>k.indexOf('PUSH_DEVICE_')===0).map(k=>{
+    try{return Object.assign(JSON.parse(props[k]),{id:k.slice('PUSH_DEVICE_'.length)});}catch(e){return null;}
+  }).filter(Boolean);
+  const data={
+    format:'ticket-management-export',version:1,exportedAt:new Date().toISOString(),
+    members:rows_('Members').filter(m=>m.id&&m.name).map(m=>({id:m.id,name:m.name,email:m.email,role:m.role==='admin'?'admin':'member',active:m.active})),
+    lives:rows_('Lives').filter(l=>l.id&&l.title),
+    attendance:rows_('Attendance').filter(a=>a.id&&a.liveId&&a.memberId),
+    tickets:rows_('Tickets').filter(t=>t.id&&t.liveId&&t.memberId),
+    settings,devices,
+  };
+  const file=DriveApp.createFile('ticket-management-export.json',JSON.stringify(data),'application/json');
+  console.log('書き出しました（イベント'+data.lives.length+'件・チケット'+data.tickets.length+'件・メンバー'+data.members.length+'人）: '+file.getUrl());
+  return file.getUrl();
+}

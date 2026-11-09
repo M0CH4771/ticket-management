@@ -28,6 +28,9 @@ let viewMode='list',cachedView=false,loading=false,refreshVersion=0,calendarMont
 try{const savedView=localStorage.getItem('ticket-view-mode');viewMode=savedView==='tiles'||savedView==='calendar'?'calendar':'list'}catch(e){}
 try{memberId=localStorage.getItem('live-pocket-member')||'';sessionStorage.removeItem('live-pocket-key')}catch(e){}
 const $=id=>document.getElementById(id);
+// The backend this page talks to: the Cloudflare API when set, otherwise the legacy GAS web app.
+const apiEndpoint=()=>window.LIVE_POCKET_CONFIG?.apiUrl||window.LIVE_POCKET_CONFIG?.gasUrl||'';
+const usesCloudflare=()=>Boolean(window.LIVE_POCKET_CONFIG?.apiUrl);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const statuses=['余り','自分用','捌けた'];
 function ticketStatusOptions(current,requireSelection=false){return (current&&!statuses.includes(current)?`<option value="${requireSelection?'':esc(current)}" disabled selected>${esc(current)}（旧設定・変更してください）</option>`:'')+opts(statuses,current)}
@@ -106,7 +109,7 @@ async function acquireQueueLease(){
   return result;
 }
 function releaseQueueLease(){if(queueLease)queueLease()}
-function outboxKey(){return 'ticket-outbox:'+window.LIVE_POCKET_CONFIG.gasUrl+':'+memberId}
+function outboxKey(){return 'ticket-outbox:'+apiEndpoint()+':'+memberId}
 function persistOutbox(){
   if(outbox.length)localStorage.setItem(outboxKey(),JSON.stringify({base:confirmedData,items:outbox}));
   else localStorage.removeItem(outboxKey());
@@ -180,7 +183,7 @@ function memberMessage(message,isError=false){const el=$('member-message');if(el
 // Firebase web config is public and rarely changes, so it is cached per GAS endpoint.
 // A cached copy lets sign-in start immediately instead of waiting for a GAS round trip.
 let authInit=null;
-function authConfigKey(){return 'ticket-auth-config:'+(window.LIVE_POCKET_CONFIG?.gasUrl||'')}
+function authConfigKey(){return 'ticket-auth-config:'+apiEndpoint()}
 function initAuth(){
   if(authInit)return authInit;
   authInit=(async()=>{
@@ -228,7 +231,7 @@ async function chooseMemberScreen(){
     try{
       const members=await rpc('getMembers');
       if(screenVersion!==refreshVersion)return;
-      if(!members.length)throw new Error('このアカウントは未登録です。管理者にMembersシートへの登録を依頼してください');
+      if(!members.length)throw new Error('このアカウントは未登録です。管理者にメンバー登録を依頼してください');
       rememberMember(members[0].id);
       if(restoreOutbox()){
         if(restoreSnapshot()){confirmedData=data;render()}
@@ -252,8 +255,8 @@ async function chooseMemberScreen(){
 // The last loaded list is kept on this device so the next launch can show it at once
 // while the latest data loads. It is removed on sign-out or when the member changes.
 const snapshotKey='ticket-snapshot-v2';
-function cacheSnapshot(){try{localStorage.setItem(snapshotKey,JSON.stringify({endpoint:window.LIVE_POCKET_CONFIG.gasUrl,memberId,data}))}catch(e){}}
-function restoreSnapshot(){try{const saved=JSON.parse(localStorage.getItem(snapshotKey)||'null');if(saved?.memberId===memberId&&saved.endpoint===window.LIVE_POCKET_CONFIG.gasUrl&&saved.data?.me?.id===memberId&&['lives','members','attendance','tickets'].every(k=>Array.isArray(saved.data[k]))){data=saved.data;cachedView=true;return true}}catch(e){}return false}
+function cacheSnapshot(){try{localStorage.setItem(snapshotKey,JSON.stringify({endpoint:apiEndpoint(),memberId,data}))}catch(e){}}
+function restoreSnapshot(){try{const saved=JSON.parse(localStorage.getItem(snapshotKey)||'null');if(saved?.memberId===memberId&&saved.endpoint===apiEndpoint()&&saved.data?.me?.id===memberId&&['lives','members','attendance','tickets'].every(k=>Array.isArray(saved.data[k]))){data=saved.data;cachedView=true;return true}}catch(e){}return false}
 function handleHistory(){if($('modal').open){closeModal()}history.replaceState({ticketView:'home'},'',location.pathname+location.search)}
 
 function attendanceDropdown(l){
@@ -391,11 +394,59 @@ function permissionInfo(){
   <h3>全メンバー共通</h3>
   <ul><li>イベント一覧の閲覧、新規登録・編集・削除（すべてのイベント）</li><li>自分の参戦予定・締切日の申込状況の変更</li><li>自分のチケット番号・状態・URLの登録、編集、削除</li><li>全員の参戦状況や、共有対象のチケット番号・余り情報の閲覧</li><li>自分の端末の通知設定</li></ul>
   <h3>管理者だけ</h3>
-  <p>LINE配信時刻と昼夜の通知内容を変更できます。</p>
-  <p class="muted">管理者でも、他のメンバーのチケット情報は編集できません。メンバーの登録・権限変更は管理スプレッドシートの Members シートで行います。</p>`;
+  <p>${usesCloudflare()?'メンバーの登録・権限変更・利用停止、LINE配信時刻と昼夜の通知内容の変更ができます。':'LINE配信時刻と昼夜の通知内容を変更できます。'}</p>
+  <p class="muted">管理者でも、他のメンバーのチケット情報は編集できません。${usesCloudflare()?'メンバーはアカウントメニューの「メンバー管理」で登録します。':'メンバーの登録・権限変更は管理スプレッドシートの Members シートで行います。'}</p>`;
   managerLiveId='';managerMode='';
   modal('権限・できること',body,()=>{});
   $('submit-save').hidden=true;
+}
+// Admin screen (Cloudflare backend): members and the one-time move from the spreadsheet.
+async function memberAdmin(){
+  if(!data?.me?.isAdmin){notice('メンバー管理は管理者のみ利用できます');return}
+  managerLiveId='';managerMode='';
+  let members;
+  try{members=await rpc('listMembers')}catch(e){notice(e.message);return}
+  const active=members.filter(m=>m.active),stopped=members.filter(m=>!m.active);
+  const row=m=>`<li class="admin-member ${m.active?'':'is-stopped'}"><div class="admin-member-main"><strong>${esc(m.name)}</strong>${m.role==='admin'?'<span class="role-badge">管理者</span>':''}${m.active?'':'<span class="flag">停止中</span>'}${m.isMe?'<span class="muted">（自分）</span>':''}<span class="admin-member-email">${esc(m.email)}</span></div><button type="button" data-edit-member="${esc(m.id)}">編集</button></li>`;
+  modal('メンバー管理',`<p class="muted">ここに登録したGoogleアカウントだけがログインできます。</p><button type="button" class="primary manager-add" id="member-add">＋ メンバーを追加</button>
+  <h3 class="admin-heading">利用中 <span class="muted">${active.length}人</span></h3><ul class="admin-members">${active.map(row).join('')||'<li class="muted">まだいません</li>'}</ul>
+  ${stopped.length?`<h3 class="admin-heading">停止中 <span class="muted">${stopped.length}人</span></h3><ul class="admin-members">${stopped.map(row).join('')}</ul>`:''}
+  <details class="admin-import"><summary>スプレッドシートからデータを移行</summary>
+  <ol class="admin-steps"><li>Apps Scriptのエディタで <code>exportForMigration</code> を選んで実行します。</li><li>Googleドライブに作られた <code>ticket-management-export.json</code> をダウンロードします。</li><li>下でそのファイルを選び「移行する」を押します。</li></ol>
+  <p class="muted">今このアプリにあるイベント・チケット・メンバーは、ファイルの内容に置き換わります。移行は最初に1回だけ行ってください。</p>
+  <label for="import-file">移行ファイル</label><input type="file" id="import-file" accept="application/json,.json"><button type="button" id="import-run" class="danger" disabled>移行する</button><p id="import-result" class="muted" role="status"></p></details>`,()=>{});
+  $('submit-save').hidden=true;
+  $('member-add').onclick=()=>memberForm();
+  document.querySelectorAll('[data-edit-member]').forEach(b=>b.onclick=()=>memberForm(members.find(m=>m.id===b.dataset.editMember)));
+  const file=$('import-file'),run=$('import-run');
+  file.onchange=()=>{run.disabled=!file.files?.length};
+  run.onclick=async()=>{
+    const chosen=file.files?.[0];if(!chosen||busy)return;
+    let payload;try{payload=JSON.parse(await chosen.text())}catch(e){$('import-result').textContent='ファイルを読み込めませんでした。exportForMigrationで書き出したJSONファイルを選んでください。';return}
+    if(!confirm('スプレッドシートのデータで、このアプリのイベント・チケット・メンバーを置き換えます。よろしいですか？'))return;
+    busy=true;run.disabled=true;$('import-result').textContent='移行しています…';
+    try{
+      const r=await rpc('importData',payload,{replace:true});
+      busy=false;modalDirty=false;$('modal').close();
+      notice(`移行しました（イベント${r.lives}件・チケット${r.tickets}枚・メンバー${r.members}人）。再読み込みします`);
+      // Member IDs now come from the spreadsheet, so sign in again to pick up this account's ID.
+      rememberMember('');data=null;confirmedData=null;chooseMemberScreen();
+    }catch(e){busy=false;run.disabled=false;$('import-result').textContent=e.message}
+  };
+}
+function memberForm(m={}){
+  managerLiveId='';managerMode='';
+  modal(m.id?'メンバーを編集':'メンバーを追加',field('名前','name',m.name,'text',true)+field('Googleアカウント（メールアドレス）','email',m.email,'email',true)+
+    `<label for="f-role">権限</label><select id="f-role" name="role"><option value="member" ${m.role!=='admin'?'selected':''}>メンバー</option><option value="admin" ${m.role==='admin'?'selected':''}>管理者</option></select>`+
+    (m.id?`<label class="duplicate-ack"><input type="checkbox" name="active" ${m.active!==false?'checked':''}>利用中（外すとログインできなくなります）</label>`:'')+
+    (m.isMe?'<p class="muted form-hint">自分自身の権限と利用状態は変更できません。</p>':''),
+    async p=>{
+      if(busy)return;busy=true;$('submit-save').disabled=true;
+      try{await rpc('saveMember',{id:m.id,name:p.name,email:p.email,role:m.isMe?m.role:p.role,active:m.isMe||!m.id?true:p.active==='on'});busy=false;modalDirty=false;notice(m.id?'メンバー情報を保存しました':'メンバーを追加しました');memberAdmin()}
+      catch(e){busy=false;$('submit-save').disabled=false;const message=$('form-message');if(message)message.textContent=e.message}
+    });
+  $('cancel').textContent='← メンバー一覧';$('cancel').onclick=()=>{if(modalDirty&&!confirm('入力中の内容を破棄して戻りますか？'))return;memberAdmin()};
+  if(m.isMe){$('f-role').disabled=true;const box=document.querySelector('[name=active]');if(box)box.disabled=true}
 }
 async function lineSettingsForm(){
   if(!data?.me?.isAdmin){notice('配信設定は管理者のみ変更できます');return}
@@ -421,7 +472,7 @@ function applyTheme(mode){
 }
 function accountMenu(){
   const name=esc(data.me.name),admin=data.me.isAdmin,role=admin?'管理者':'メンバー';
-  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><p class="theme-switch-label" id="theme-label">表示</p><div class="theme-switch" role="group" aria-labelledby="theme-label">${[['auto','自動'],['light','ライト'],['dark','ダーク']].map(([v,l])=>`<button type="button" data-theme-mode="${v}" aria-pressed="${themeMode()===v}">${l}</button>`).join('')}</div><button type="button" id="logout">ログアウト</button></div></details>`;
+  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${admin&&usesCloudflare()?'<button type="button" id="member-admin">メンバー管理</button>':''}${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><p class="theme-switch-label" id="theme-label">表示</p><div class="theme-switch" role="group" aria-labelledby="theme-label">${[['auto','自動'],['light','ライト'],['dark','ダーク']].map(([v,l])=>`<button type="button" data-theme-mode="${v}" aria-pressed="${themeMode()===v}">${l}</button>`).join('')}</div><button type="button" id="logout">ログアウト</button></div></details>`;
 }
 function renderHome(){if(!data)return;const today=japanDay();lastDay=today;const todayPending=(data.lives||[]).filter(l=>!l.archived&&l.lotteryDeadline===today&&['未確認','未申込'].includes(myApplicationStatus(l))).length;const lives=sortedEvents(data.lives.filter(l=>archiveView?l.archived===true:(l.date>=today&&!l.archived)),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
 $('account').innerHTML=accountMenu();
@@ -444,6 +495,7 @@ if($('today-application-alert'))$('today-application-alert').onclick=()=>{archiv
 $('application-filter').onchange=e=>{applicationFilter=e.target.value;drawTiles(lives,today)};
 $('notification-settings').onclick=()=>{closeAccount();import('./notifications.js').then(m=>m.open(memberId)).catch(()=>notice('通知設定を開けませんでした。再読込してください。'))};
 if($('line-admin-settings'))$('line-admin-settings').onclick=()=>{closeAccount();lineSettingsForm()};
+if($('member-admin'))$('member-admin').onclick=()=>{closeAccount();memberAdmin()};
 $('permissions-help').onclick=()=>{closeAccount();permissionInfo()};
 document.querySelectorAll('[data-theme-mode]').forEach(b=>b.onclick=()=>applyTheme(b.dataset.themeMode));
 document.querySelectorAll('[data-my-filter]').forEach(b=>b.onclick=()=>{myFilter=b.dataset.myFilter;document.querySelectorAll('[data-my-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.myFilter===myFilter)));drawTiles(lives,today)});
@@ -644,5 +696,5 @@ window.addEventListener('popstate',handleHistory);
 document.addEventListener('click',e=>{document.querySelectorAll('details.ev-more[open],details.account-menu[open]').forEach(d=>{if(!d.contains(e.target))d.open=false})});
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const open=document.querySelector('details.ev-more[open],details.account-menu[open]');if(open){open.open=false;open.querySelector('summary').focus()}});
 history.replaceState({ticketView:'home'},'',location.pathname+location.search);
-if(!window.LIVE_POCKET_CONFIG?.gasUrl)showSetup();else startApp();
+if(!apiEndpoint())showSetup();else startApp();
 </script></body></html>

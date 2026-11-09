@@ -36,5 +36,18 @@ const before=sent.length;const waiting=context.window.LivePocketTransport.call('
 let asked=0;release({getIdToken:async()=>{asked++;return 'late-token'}});for(let i=0;i<5;i++)await new Promise(setImmediate);assert.equal(asked,1);
 context.window.LivePocketAuthReady=undefined;await assert.rejects(context.window.LivePocketTransport.call('getData','1'),/ログイン/);
 assert.equal(typeof context.window.LivePocketTransport.warm,'function');}
+// Cloudflare API: plain HTTPS POST with the token in the Authorization header, never in the body or URL.
+{const requests=[];const api={...context,window:{LivePocketAuth:{getIdToken:async()=>'api-token'},LIVE_POCKET_CONFIG:{apiUrl:'https://api.example.workers.dev/'},addEventListener(){},removeEventListener(){}},
+ document:{createElement:()=>({}),head:{appendChild(){}},body:{appendChild(){}}},AbortController,
+ fetch:async(url,init)=>{requests.push({url,init});return {json:async()=>JSON.parse(init.body).method==='saveData'?{ok:false,error:'他の更新がありました。再読込してください'}:{ok:true,value:{echo:JSON.parse(init.body)}}}}};
+vm.createContext(api);vm.runInContext(fs.readFileSync(__dirname+'/../docs/transport.js','utf8'),api);
+const value=await api.window.LivePocketTransport.call('getData','member-1');
+assert.equal(requests[0].url,'https://api.example.workers.dev/api/rpc');assert.equal(requests[0].init.headers.authorization,'Bearer api-token');
+assert.deepEqual(JSON.parse(JSON.stringify(value.echo)),{method:'getData',args:['member-1']});assert.ok(!requests[0].init.body.includes('api-token'));assert.equal(requests[0].init.credentials,'omit');
+await assert.rejects(api.window.LivePocketTransport.call('saveData','m','live',{}),/他の更新/);
+await api.window.LivePocketTransport.call('getAuthConfig');assert.equal(requests.at(-1).init.headers.authorization,undefined);
+api.fetch=async()=>{throw new TypeError('Failed to fetch')};await assert.rejects(api.window.LivePocketTransport.call('saveData','m','live',{}),/登録済みか再読込/);
+api.window.LIVE_POCKET_CONFIG.apiUrl='http://api.example.com';await assert.rejects(api.window.LivePocketTransport.call('getData','m'),/https/);
+console.log('PASS: Cloudflare API transport (Authorization header, errors, no token in body, https only)');}
 console.log('PASS: iframe handshake, origin/source checks, RPC response, mutation timeout without retry, method allowlist, bridge reply and replay prevention');
 })().catch(e=>{console.error(e);process.exit(1)});

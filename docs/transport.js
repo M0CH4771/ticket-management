@@ -1,11 +1,51 @@
-/* GitHub Pages -> isolated GAS iframe -> google.script.run.
- * Auth tokens are passed only in RPC arguments, never in URLs or logs. No JSONP,
- * no-cors writes, or automatic mutation retries.
+/* Two backends behind one call(method, ...args) interface:
+ *  - apiUrl set (Cloudflare Worker): HTTPS POST to /api/rpc with the Firebase ID token
+ *    in the Authorization header. Fast; no iframe.
+ *  - otherwise (legacy Google Apps Script): isolated GAS iframe -> google.script.run,
+ *    with the token passed only as the first RPC argument.
+ * Tokens never go into URLs or logs. No JSONP, no-cors writes, or automatic mutation retries.
  */
 (() => {
   const pending = new Map();
   let connection, dispose;
-  const methods = new Set(['getAuthConfig', 'getMembers', 'registerMember', 'getData', 'saveData', 'getAdminSettings', 'saveAdminSettings', 'getPushSettings', 'savePushSubscription', 'removePushSubscription', 'testPushSubscription']);
+  const methods = new Set(['getAuthConfig', 'getMembers', 'registerMember', 'getData', 'saveData', 'getAdminSettings', 'saveAdminSettings', 'getPushSettings', 'savePushSubscription', 'removePushSubscription', 'testPushSubscription', 'listMembers', 'saveMember', 'importData']);
+  const mutations = new Set(['saveData', 'registerMember', 'saveAdminSettings', 'savePushSubscription', 'removePushSubscription', 'testPushSubscription', 'saveMember', 'importData']);
+  const timeoutMessage = mutation => mutation ? '応答がありません。登録済みの可能性があります。再読込して内容を確認してから操作してください。' : '読み込みに時間がかかっています。再読込を押して、もう一度お試しください。';
+  function apiBase() {
+    const value = window.LIVE_POCKET_CONFIG?.apiUrl;
+    if (!value) return null;
+    const url = new URL(value);
+    const local = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    if ((url.protocol !== 'https:' && !local) || url.search || url.hash) throw new Error('APIのURL（https://…）を確認してください');
+    return url.origin + url.pathname.replace(/\/+$/, '');
+  }
+  async function authHeader(method) {
+    if (method === 'getAuthConfig') return {};
+    const authApi = window.LivePocketAuth || await window.LivePocketAuthReady;
+    if (!authApi) throw new Error('Googleアカウントでログインしてください');
+    return {authorization: 'Bearer ' + await authApi.getIdToken()};
+  }
+  async function fetchCall(base, method, args) {
+    const mutation = mutations.has(method), controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), mutation ? 30000 : 20000);
+    try {
+      const headers = {'content-type': 'application/json', ...await authHeader(method)};
+      let response;
+      try {
+        response = await fetch(base + '/api/rpc', {method: 'POST', headers, body: JSON.stringify({method, args}), signal: controller.signal, credentials: 'omit', cache: 'no-store'});
+      } catch (error) {
+        if (error?.name === 'AbortError') throw new Error(timeoutMessage(mutation));
+        throw new Error(mutation ? '保存先に接続できませんでした。登録済みか再読込して確認してから操作してください。' : '保存先に接続できませんでした。通信環境を確認して、もう一度読み込んでください。');
+      }
+      let body;
+      try {body = await response.json();} catch {throw new Error('保存先から正しい応答がありませんでした。少し待って再度お試しください。');}
+      if (!body?.ok) throw new Error(body?.error || '保存先でエラーが発生しました');
+      return body.value;
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new Error(timeoutMessage(mutation));
+      throw error;
+    } finally {clearTimeout(timer);}
+  }
   function validateEndpoint(value) {
     const url = new URL(value);
     if (url.origin !== 'https://script.google.com' || !/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url.pathname) || url.search || url.hash) throw new Error('GASの公開URL（末尾 /exec）を確認してください');
@@ -56,7 +96,10 @@
   }
   function call(method, ...args) {
     if (!methods.has(method)) return Promise.reject(new Error('未対応の操作です'));
-    const mutation = method === 'saveData' || method === 'registerMember' || method === 'saveAdminSettings' || method === 'savePushSubscription' || method === 'removePushSubscription' || method === 'testPushSubscription';
+    let base;
+    try {base = apiBase();} catch (error) {return Promise.reject(error);}
+    if (base) return fetchCall(base, method, args);
+    const mutation = mutations.has(method);
     return new Promise((resolve, reject) => {
       const id = crypto.randomUUID();
       let settled = false;
@@ -67,7 +110,7 @@
       }
       // One deadline includes both iframe startup and the server response.
       const timeout = setTimeout(() => {
-        finish(new Error(mutation ? '応答がありません。登録済みの可能性があります。再読込して内容を確認してから操作してください。' : '読み込みに時間がかかっています。再読込を押して、もう一度お試しください。'));
+        finish(new Error(timeoutMessage(mutation)));
         resetIdleConnection();
       }, mutation ? 80000 : 30000);
       pending.set(id, {finish});
@@ -86,6 +129,17 @@
     });
   }
   // Start the GAS iframe handshake early so it overlaps with sign-in.
-  function warm() {try {connect().catch(() => {});} catch {}}
+  function warm() {
+    try {
+      const base = apiBase();
+      if (base) {
+        // Open the HTTPS connection to the API while sign-in is still starting.
+        const link = document.createElement('link');link.rel = 'preconnect';link.href = new URL(base).origin;link.crossOrigin = 'anonymous';
+        document.head.appendChild(link);
+        return;
+      }
+      connect().catch(() => {});
+    } catch {}
+  }
   window.LivePocketTransport = {call, warm};
 })();

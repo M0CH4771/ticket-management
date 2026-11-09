@@ -389,6 +389,19 @@ dialog::backdrop{background:rgba(18,35,63,.45)}
 .surplus-numbers span{font-weight:400;font-size:var(--fs-sm);color:var(--ink-2)}
 .surplus-event button{min-height:36px;font-size:var(--fs-sm)}
 
+/* Admin screen */
+.admin-heading{margin:18px 0 6px;font-size:var(--fs-md)}
+.admin-members{list-style:none;margin:0;padding:0}
+.admin-member{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.admin-member-main{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0}
+.admin-member-email{flex-basis:100%;font-size:var(--fs-sm);color:var(--ink-2);overflow-wrap:anywhere}
+.admin-member.is-stopped strong{color:var(--ink-3)}
+.admin-member>button{flex:none;min-height:36px;padding:4px 12px;font-size:var(--fs-sm)}
+.admin-steps{margin:8px 0;padding-left:20px;font-size:var(--fs-sm);line-height:1.8}
+.admin-import code{padding:1px 5px;border-radius:4px;background:var(--mute-2);font-size:.92em;overflow-wrap:anywhere}
+.admin-import input[type=file]{min-height:0;padding:10px;font-size:var(--fs-sm)}
+.admin-import #import-run{width:100%;margin-top:12px}
+
 /* ---------- Save status, toast, loading ---------- */
 .sync-panel{position:fixed;right:16px;bottom:max(76px,calc(env(safe-area-inset-bottom) + 64px));z-index:15;width:min(340px,calc(100vw - 32px));max-height:45dvh;overflow:auto;padding:0 14px;border:1px solid var(--sun-line);border-radius:var(--r-md);background:var(--sun-tint);box-shadow:var(--shadow-pop);font-size:var(--fs-sm)}
 .sync-panel>summary{display:flex;align-items:center;min-height:var(--tap);font-weight:700}
