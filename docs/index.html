@@ -5,6 +5,7 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#16213a" media="(prefers-color-scheme: dark)">
+<script id="in-app-browser">try{(function(){var ua=navigator.userAgent||'',u=new URL(location.href),k='openExternalBrowser';if(/\bLine\/\d/i.test(ua)){if(u.searchParams.get(k)!=='1'){u.searchParams.set(k,'1');location.replace(u.href)}}else if(u.searchParams.has(k)){u.searchParams.delete(k);history.replaceState(history.state,'',u.href)}})()}catch(e){}</script>
 <script id="theme-init">try{var t=localStorage.getItem('ticket-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;document.querySelectorAll('meta[name=theme-color]').forEach(function(m){m.content=t==='dark'?'#16213a':'#ffffff'})}}catch(e){}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ticket Management">
@@ -14,7 +15,7 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js">
-<link rel="stylesheet" href="./styles.css?v=20261109"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
+<link rel="stylesheet" href="./styles.css?v=20261109b"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
   <div class="startup-content"><div class="startup-mark"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#12233f"/><defs><mask id="startup-hole"><rect x="-400" y="-400" width="800" height="800" fill="#fff"/><polygon points="-49.5,-54.0 -35.4,-15.4 5.7,-13.9 -26.7,11.4 -15.4,50.9 -49.5,28.0 -83.6,50.9 -72.3,11.4 -104.7,-13.9 -63.6,-15.4" fill="#000"/></mask></defs><g transform="translate(244 262) scale(1.04) rotate(-12)"><path class="ticket" d="M-145.0,-95.0 H61.0 A22,22 0 0 1 83.0,-73.0 V73.0 A22,22 0 0 1 61.0,95.0 H-145.0 A22,22 0 0 1 -167.0,73.0 V26.0 A26,26 0 0 0 -167.0,-26.0 V-73.0 A22,22 0 0 1 -145.0,-95.0 Z" fill="#ffffff" mask="url(#startup-hole)"/><circle cx="83.0" cy="-77.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="0.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="77.0" r="6.5" fill="#12233f"/><g class="stub-tear"><g class="stub" transform="translate(99.0 8) rotate(11 0 95.0)"><path d="M22,-95.0 H74 A22,22 0 0 1 96,-73.0 V-26.0 A26,26 0 0 0 96,26.0 V73.0 A22,22 0 0 1 74,95.0 H22 A22,22 0 0 1 0,73.0 V-73.0 A22,22 0 0 1 22,-95.0 Z" fill="#ff5b45"/></g></g></g></svg></div><strong class="startup-title">Ticket Management</strong></div>
 </div>
 <script id="startup-once">try{var d=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});if(localStorage.getItem('ticket-startup-day')===d)document.getElementById('startup-screen').remove();else localStorage.setItem('ticket-startup-day',d)}catch(e){}</script>
@@ -214,6 +215,7 @@ async function startApp(){
   finishStartup();
   setTimeout(()=>import('./notifications.js').then(m=>m.resume()).catch(()=>{}),1000);
 }
+function inAppBrowser(){return /\bLine\/\d|FBAN|FBAV|Instagram|Twitter|MicroMessenger|KAKAOTALK|YJApp/i.test(navigator.userAgent||'')}
 async function chooseMemberScreen(){
   const screenVersion=++refreshVersion;loading=false;cachedView=false;
   data=null;selected='';searchQuery='';groupFilter='';myFilter='すべて';memberId='';$('account').textContent='';
@@ -222,6 +224,12 @@ async function chooseMemberScreen(){
     const host=$('member-options');if(!host)return;
     host.innerHTML=(showSignIn?'<button id="google-sign-in" class="primary">Googleでログイン</button>':'')+'<button id="retry-members">再読込</button>';
     $('retry-members').onclick=chooseMemberScreen;
+    if(showSignIn&&inAppBrowser()){
+      const note=document.createElement('div');note.className='in-app-note';
+      note.innerHTML='<b>LINEなどのアプリの中ではGoogleログインできません。</b><br>画面の「…」や共有ボタンから「ブラウザで開く」を選ぶか、下のボタンでURLをコピーしてSafari・Chromeに貼り付けて開いてください。<button id="copy-site-url" type="button">このページのURLをコピー</button>';
+      host.prepend(note);
+      $('copy-site-url').onclick=async()=>{const url=location.href.split('#')[0];try{await navigator.clipboard.writeText(url);$('copy-site-url').textContent='コピーしました'}catch(e){prompt('このURLをコピーしてください',url)}};
+    }
     $('google-sign-in')?.addEventListener('click',async()=>{
       const button=$('google-sign-in');button.disabled=true;memberMessage('Googleに接続中…');
       try{await auth.signIn();await finishLogin()}catch(e){memberMessage(e.message||'ログインできませんでした。もう一度お試しください',true);button.disabled=false}
