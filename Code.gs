@@ -1,12 +1,12 @@
 const TABLES = {
-  Lives: ['id','title','date','venue','sheetUrl','memo','owner','version','lotteryDeadline','requiredThrows','purchaseUrl','groups'],
+  Lives: ['id','title','date','venue','sheetUrl','memo','owner','version','lotteryDeadline','requiredThrows','purchaseUrl','groups','archived'],
   Members: ['id','name','tokenHash','active','email','role'],
   Attendance: ['id','liveId','memberId','status','version','applied'],
   Tickets: ['id','liveId','memberId','number','status','recipient','memo','version','ticketUrl'],
 };
 // Column positions and internal keys remain stable; only sheet labels are translated.
 const HEADERS_JA = {
-  Lives: ['イベントID（自動）','イベント名','開催日','会場','関連スプシURL','メモ','登録者ID','更新番号（自動）','抽選締切','必要投げ数（1人あたり）','チケット購入URL','出演グループ'],
+  Lives: ['イベントID（自動）','イベント名','開催日','会場','関連スプシURL','メモ','登録者ID','更新番号（自動）','抽選締切','必要投げ数（1人あたり）','チケット購入URL','出演グループ','アーカイブ'],
   Members: ['メンバーID（自動）','名前','旧認証情報（使用しません）','利用状態（yes / no）','Googleアカウント','権限（admin / member）'],
   Attendance: ['参戦予定ID','イベントID','メンバーID','参戦状況','更新番号','申込状況'],
   Tickets: ['チケットID','イベントID','メンバーID','整理番号','チケット状況','譲り先','メモ','更新番号','本人用チケットURL'],
@@ -34,7 +34,7 @@ function setup_() {
       s.getRange(1,1,1,TABLES[name].length).setFontWeight('bold').setBackground('#dde8ff');
     });
     p.setProperty('SHEET_ID',ss.getId());
-    p.setProperty('SCHEMA_VERSION','japanese-headers-v5');
+    p.setProperty('SCHEMA_VERSION','japanese-headers-v6');
     console.log('管理スプレッドシート: '+ss.getUrl());
   } finally { lock.releaseLock(); }
 }
@@ -42,15 +42,15 @@ function ensureReady_(maintenance=true) {
   resetRequest_();
   const p=PropertiesService.getScriptProperties();
   if(!p.getProperty('SHEET_ID')) setup_();
-  if(!maintenance && p.getProperty('SCHEMA_VERSION')==='japanese-headers-v5') return;
+  if(!maintenance && p.getProperty('SCHEMA_VERSION')==='japanese-headers-v6') return;
   const lock=LockService.getScriptLock(); lock.waitLock(10000);
   try {
-    if(p.getProperty('SCHEMA_VERSION')!=='japanese-headers-v5') {
+    if(p.getProperty('SCHEMA_VERSION')!=='japanese-headers-v6') {
       // Validate every table before changing any header. Preserve all existing rows.
       Object.keys(TABLES).forEach(name=>{
         const headers=sheet_(name).getDataRange().getDisplayValues()[0]||[];
         TABLES[name].forEach((key,i)=>{
-          const additiveColumn=(name==='Members'&&i>=4)||(name==='Attendance'&&i>=5);
+          const additiveColumn=(name==='Members'&&i>=4)||(name==='Attendance'&&i>=5)||(name==='Lives'&&i>=12);
           if(headers[i]!==key && headers[i]!==HEADERS_JA[name][i] && !((name==='Lives' && i>=8 || name==='Tickets' && i===8) && !headers[i]) && !(additiveColumn&&!headers[i]))
             throw new Error(name+'の列の順番を確認してください');
         });
@@ -101,7 +101,7 @@ function deletePastEvents_() {
   // Only event rows are deleted. Member, attendance and ticket records are retained.
   for(let i=rows.length-1;i>=1;i--) {
     const row=rows[i],date=normalizeDate_(row[2],Number(today.slice(0,4)));
-    if(String(row[1]||'').trim() && date && date<today) {s.deleteRow(i+1);invalidate_('Lives');}
+    if(String(row[1]||'').trim() && date && date<today && String(row[12]||'')!=='yes') {s.getRange(i+1,13).setValue('yes');invalidate_('Lives');}
   }
 }
 // Run once in the Apps Script editor to authorize and enable unattended cleanup.
@@ -188,7 +188,7 @@ function validateGroups_(value) {
   return [...new Map(names.map(n=>[n.toLowerCase(),n])).values()];
 }
 function snapshot_(me) {
-  const lives=rows_('Lives').filter(l=>l.id&&l.title&&normalizeDate_(l.date,Number(japanToday_().slice(0,4)))).map(l=>({...l,groups:readGroups_(l.groups)}));
+  const lives=rows_('Lives').filter(l=>l.id&&l.title&&normalizeDate_(l.date,Number(japanToday_().slice(0,4)))).map(l=>({...l,archived:String(l.archived||'')==='yes',groups:readGroups_(l.groups)}));
   const groups=[...new Set(lives.flatMap(l=>l.groups))].sort((a,b)=>a.localeCompare(b,'ja'));
   const attendance=rows_('Attendance').map(a=>a.status==='不参加'?{...a,applied:'申込不要'}:a);
   return {me:{id:me.id,name:me.name,isAdmin:me.role==='admin'},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives,groups,attendance,tickets:rows_('Tickets'),capabilities:{durableSave:true},updatedAt:new Date().toISOString()};
@@ -244,7 +244,8 @@ function adminSettings_() {
     dayTime:p.getProperty('LINE_DAY_TIME')||'12:00',
     nightTime:p.getProperty('LINE_NIGHT_TIME')||'21:00',
     dayMode:p.getProperty('LINE_DAY_MODE')||'all',
-    nightMode:p.getProperty('LINE_NIGHT_MODE')||'unconfirmed'
+    nightMode:p.getProperty('LINE_NIGHT_MODE')||'unconfirmed',
+    delivery:lineDeliveryStatus_()
   };
 }
 function getAdminSettings(idToken) {
@@ -311,7 +312,7 @@ function write_(table,row,old) {
 }
 function recordChange_(table,row) {
   const normalized=Object.fromEntries(TABLES[table].map(k=>[k,String(row[k]??'')]));
-  if(table==='Lives') normalized.groups=readGroups_(normalized.groups);
+  if(table==='Lives'){normalized.groups=readGroups_(normalized.groups);normalized.archived=normalized.archived==='yes';}
   if(!requestChanges[table]) requestChanges[table]={upsert:[],remove:[]};
   requestChanges[table].upsert.push(normalized);
 }
@@ -361,7 +362,13 @@ function saveData(idToken,memberId,action,payload,options) {
       const date=normalizeDate_(p.date,Number(japanToday_().slice(0,4))); if(!date) throw new Error('日付を確認してください');
       if(date<japanToday_()) throw new Error('終了済みのイベントは登録できません');
       const url=text_(p.sheetUrl,600,false); if(url&&!/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url)) throw new Error('スプレッドシートURLを確認してください');
-      write_('Lives',{id:old?old.id:Utilities.getUuid(),title:text_(p.title,120,true),date,groups:JSON.stringify(validateGroups_(p.groups===undefined?readGroups_(old?.groups):p.groups)),purchaseUrl:purchaseUrl_(p.purchaseUrl===undefined?old?.purchaseUrl:p.purchaseUrl),lotteryDeadline:deadline_(p.lotteryDeadline===undefined?old?.lotteryDeadline:p.lotteryDeadline),requiredThrows:throws_(p.requiredThrows===undefined?old?.requiredThrows:p.requiredThrows),venue:text_(p.venue,120,false),sheetUrl:url,memo:text_(p.memo,500,false),owner:old?.owner||me.id,version:old?Number(old.version)+1:1},old);
+      write_('Lives',{id:old?old.id:Utilities.getUuid(),title:text_(p.title,120,true),date,groups:JSON.stringify(validateGroups_(p.groups===undefined?readGroups_(old?.groups):p.groups)),purchaseUrl:purchaseUrl_(p.purchaseUrl===undefined?old?.purchaseUrl:p.purchaseUrl),lotteryDeadline:deadline_(p.lotteryDeadline===undefined?old?.lotteryDeadline:p.lotteryDeadline),requiredThrows:throws_(p.requiredThrows===undefined?old?.requiredThrows:p.requiredThrows),venue:text_(p.venue,120,false),sheetUrl:url,memo:text_(p.memo,500,false),owner:old?.owner||me.id,version:old?Number(old.version)+1:1,archived:old?.archived||''},old);
+    } else if(action==='archiveLive'||action==='restoreLive') {
+      const live=rows_('Lives').find(x=>x.id===p.id);
+      if(!live)throw new Error('イベントが見つかりません');
+      if(!canEditLive_(live,me))throw new Error('イベントを変更できません');
+      if(String(p.version)!==live.version)throw new Error('他の更新がありました。再読込してください');
+      write_('Lives',{...live,archived:action==='archiveLive'?'yes':'',version:Number(live.version)+1},live);
     } else if(action==='deleteLive') {
       const live=rows_('Lives').find(x=>x.id===p.id);
       if(!live) throw new Error('ライブが見つかりません');
@@ -386,7 +393,7 @@ function saveData(idToken,memberId,action,payload,options) {
       } else if(action==='application') {
         const old=rows_('Attendance').find(x=>x.liveId===p.liveId&&x.memberId===me.id);
         if(old&&p.version!==undefined&&String(p.version)!==old.version)throw new Error('申込状況が更新されています。再読込してください');
-        const selected=enum_(p.applied,['申込済み','申込不要','未確認']);
+        const selected=enum_(p.applied,['申込済み','申込不要','未確認','未申込']);
         const applied=old?.status==='不参加'?'申込不要':selected==='未確認'?'':selected;
         write_('Attendance',{id:old?old.id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,status:old?.status||'',applied,version:old?Number(old.version)+1:1},old);
       } else if(action==='addTickets') {
