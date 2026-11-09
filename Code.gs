@@ -245,7 +245,6 @@ function adminSettings_() {
     nightTime:p.getProperty('LINE_NIGHT_TIME')||'21:00',
     dayMode:p.getProperty('LINE_DAY_MODE')||'all',
     nightMode:p.getProperty('LINE_NIGHT_MODE')||'unconfirmed',
-    delivery:lineDeliveryStatus_()
   };
 }
 function getAdminSettings(idToken) {
