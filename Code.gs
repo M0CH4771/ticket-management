@@ -189,7 +189,8 @@ function validateGroups_(value) {
 function snapshot_(me) {
   const lives=rows_('Lives').filter(l=>l.id&&l.title&&normalizeDate_(l.date,Number(japanToday_().slice(0,4)))).map(l=>({...l,groups:readGroups_(l.groups)}));
   const groups=[...new Set(lives.flatMap(l=>l.groups))].sort((a,b)=>a.localeCompare(b,'ja'));
-  return {me:{id:me.id,name:me.name,isAdmin:me.role==='admin'},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives,groups,attendance:rows_('Attendance'),tickets:rows_('Tickets'),capabilities:{durableSave:true},updatedAt:new Date().toISOString()};
+  const attendance=rows_('Attendance').map(a=>a.status==='不参加'?{...a,applied:'申込不要'}:a);
+  return {me:{id:me.id,name:me.name,isAdmin:me.role==='admin'},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives,groups,attendance,tickets:rows_('Tickets'),capabilities:{durableSave:true},updatedAt:new Date().toISOString()};
 }
 function firebaseAuthConfig_() {
   try {
@@ -378,12 +379,15 @@ function saveData(idToken,memberId,action,payload,options) {
       if(action==='attendance') {
         const old=rows_('Attendance').find(x=>x.liveId===p.liveId&&x.memberId===me.id);
         if(old && String(p.version)!==old.version) throw new Error('他の更新がありました。再読込してください');
-        write_('Attendance',{id:old?old.id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,status:enum_(p.status,['参戦','未定','不参加']),applied:old?.applied||'',version:old?Number(old.version)+1:1},old);
+        const status=enum_(p.status,['参戦','未定','不参加']);
+        const applied=status==='不参加'?'申込不要':old?.status==='不参加'?'':old?.applied||'';
+        write_('Attendance',{id:old?old.id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,status,applied,version:old?Number(old.version)+1:1},old);
       } else if(action==='application') {
         const old=rows_('Attendance').find(x=>x.liveId===p.liveId&&x.memberId===me.id);
         if(old&&p.version!==undefined&&String(p.version)!==old.version)throw new Error('申込状況が更新されています。再読込してください');
-        const applied=enum_(p.applied,['申込済み','申込不要','未確認']);
-        write_('Attendance',{id:old?old.id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,status:old?.status||'',applied:applied==='未確認'?'':applied,version:old?Number(old.version)+1:1},old);
+        const selected=enum_(p.applied,['申込済み','申込不要','未確認']);
+        const applied=old?.status==='不参加'?'申込不要':selected==='未確認'?'':selected;
+        write_('Attendance',{id:old?old.id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,status:old?.status||'',applied,version:old?Number(old.version)+1:1},old);
       } else if(action==='addTickets') {
         // Accept the old uniform-status payload as well as per-ticket entries.
         const input=p.entries!==undefined?p.entries:(Array.isArray(p.numbers)?p.numbers.map(number=>({number,status:p.status})):null);
