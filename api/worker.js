@@ -17,7 +17,7 @@
  */
 
 const SCHEMA = `
-CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, role TEXT NOT NULL DEFAULT 'member', active INTEGER NOT NULL DEFAULT 1, created_at TEXT);
+CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE, role TEXT NOT NULL DEFAULT 'member', active INTEGER NOT NULL DEFAULT 1, created_at TEXT);
 CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, title TEXT NOT NULL, date TEXT NOT NULL, venue TEXT NOT NULL DEFAULT '', sheet_url TEXT NOT NULL DEFAULT '', memo TEXT NOT NULL DEFAULT '', owner TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1, lottery_deadline TEXT NOT NULL DEFAULT '', required_throws TEXT NOT NULL DEFAULT '', purchase_url TEXT NOT NULL DEFAULT '', groups TEXT NOT NULL DEFAULT '[]', archived INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, event_id TEXT NOT NULL, member_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT '', applied TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1, UNIQUE(event_id, member_id));
 CREATE TABLE IF NOT EXISTS tickets (id TEXT PRIMARY KEY, event_id TEXT NOT NULL, member_id TEXT NOT NULL, number TEXT NOT NULL DEFAULT '', number_key TEXT NOT NULL DEFAULT '', status TEXT NOT NULL, recipient TEXT NOT NULL DEFAULT '', memo TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1, ticket_url TEXT NOT NULL DEFAULT '');
@@ -361,7 +361,7 @@ async function saveData(ctx, memberId, action, payload, options) {
 async function listMembers({ db, me }) {
   requireAdmin(me);
   return (await all(db, 'SELECT id, name, email, role, active FROM members ORDER BY active DESC, created_at, name'))
-    .map(m => ({ id: m.id, name: m.name, email: m.email, role: m.role, active: m.active === 1, isMe: m.id === me.id }));
+    .map(m => ({ id: m.id, name: m.name, email: m.email || '', role: m.role, active: m.active === 1, isMe: m.id === me.id }));
 }
 async function saveMember({ db, me, env }, input) {
   requireAdmin(me, 'メンバー登録は管理者のみ実行できます');
@@ -423,13 +423,14 @@ async function importData({ db, me, env }, data, options) {
     const email = normalizeEmail(m.email), id = String(m.id || '');
     if (!UUID.test(id) && !/^[\w-]{1,64}$/.test(id)) continue;
     if (!String(m.name || '').trim()) continue;
-    members.set(id, { id, name: String(m.name).trim().slice(0, 40), email: email || `no-email+${id}@invalid.local`, role: m.role === 'admin' ? 'admin' : 'member',
+    // Members without a Google account are kept as they are (they cannot sign in until an email is set).
+    members.set(id, { id, name: String(m.name).trim().slice(0, 40), email: email || null, role: m.role === 'admin' ? 'admin' : 'member',
       active: String(m.active) === 'yes' || m.active === true ? 1 : 0, created_at: new Date().toISOString() });
   }
   // Keep the person running the import signed in, even if the sheet had no email for them.
   if (![...members.values()].some(m => m.email === me.email)) members.set(me.id, { id: me.id, name: me.name, email: me.email, role: 'admin', active: 1, created_at: new Date().toISOString() });
   const seenEmail = new Set();
-  for (const [id, m] of members) { if (seenEmail.has(m.email)) members.delete(id); else seenEmail.add(m.email); }
+  for (const [id, m] of members) { if (!m.email) continue; if (seenEmail.has(m.email)) members.delete(id); else seenEmail.add(m.email); }
   const events = list(data.lives).map(l => {
     const date = normalizeDate(l.date, year);
     if (!l.id || !String(l.title || '').trim() || !date) return null;
@@ -440,7 +441,8 @@ async function importData({ db, me, env }, data, options) {
   }).filter(Boolean);
   const eventIds = new Set(events.map(e => e.id));
   const attendanceSeen = new Set();
-  const attendance = list(data.attendance).filter(a => a.id && eventIds.has(String(a.liveId)) && a.memberId).map(a => ({
+  // Every row moves as it is, including rows of events deleted earlier (the app keeps those too).
+  const attendance = list(data.attendance).filter(a => a.id && a.liveId && a.memberId).map(a => ({
     id: String(a.id), event_id: String(a.liveId), member_id: String(a.memberId), status: ['参戦', '未定', '不参加'].includes(a.status) ? a.status : '',
     applied: ['申込済み', '申込不要', '未申込'].includes(a.applied) ? a.applied : '', version: Math.max(1, Number(a.version) || 1),
   })).filter(a => { const k = a.event_id + '|' + a.member_id; if (attendanceSeen.has(k)) return false; attendanceSeen.add(k); return true; });

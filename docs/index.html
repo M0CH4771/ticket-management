@@ -407,7 +407,7 @@ async function memberAdmin(){
   let members;
   try{members=await rpc('listMembers')}catch(e){notice(e.message);return}
   const active=members.filter(m=>m.active),stopped=members.filter(m=>!m.active);
-  const row=m=>`<li class="admin-member ${m.active?'':'is-stopped'}"><div class="admin-member-main"><strong>${esc(m.name)}</strong>${m.role==='admin'?'<span class="role-badge">管理者</span>':''}${m.active?'':'<span class="flag">停止中</span>'}${m.isMe?'<span class="muted">（自分）</span>':''}<span class="admin-member-email">${esc(m.email)}</span></div><button type="button" data-edit-member="${esc(m.id)}">編集</button></li>`;
+  const row=m=>`<li class="admin-member ${m.active?'':'is-stopped'}"><div class="admin-member-main"><strong>${esc(m.name)}</strong>${m.role==='admin'?'<span class="role-badge">管理者</span>':''}${m.active?'':'<span class="flag">停止中</span>'}${m.isMe?'<span class="muted">（自分）</span>':''}<span class="admin-member-email">${m.email?esc(m.email):'Googleアカウント未設定（ログインできません）'}</span></div><button type="button" data-edit-member="${esc(m.id)}">編集</button></li>`;
   modal('メンバー管理',`<p class="muted">ここに登録したGoogleアカウントだけがログインできます。</p><button type="button" class="primary manager-add" id="member-add">＋ メンバーを追加</button>
   <h3 class="admin-heading">利用中 <span class="muted">${active.length}人</span></h3><ul class="admin-members">${active.map(row).join('')||'<li class="muted">まだいません</li>'}</ul>
   ${stopped.length?`<h3 class="admin-heading">停止中 <span class="muted">${stopped.length}人</span></h3><ul class="admin-members">${stopped.map(row).join('')}</ul>`:''}

@@ -295,14 +295,18 @@ async function lineHook(body, secret = 'line-secret') {
       { id: 'm-1', name: '旧メンバー', email: 'old@example.com', role: 'member', active: 'yes' },
       { id: 'm-2', name: '管理者', email: 'admin@example.com', role: 'admin', active: 'yes' },
       { id: 'm-3', name: '停止中', email: 'stopped@example.com', role: 'member', active: '' },
+      { id: 'm-4', name: 'メールなし1', email: '', role: 'member', active: 'yes' },
+      { id: 'm-5', name: 'メールなし2', email: '', role: 'member', active: 'yes' },
     ],
     lives: [
       { id: 'l-1', title: '移行イベント', date: later, venue: '会場', version: '4', lotteryDeadline: tomorrow, requiredThrows: '2', groups: '["G1"]', archived: '' },
       { id: 'l-2', title: '過去', date: '2025/1/10', version: '1', archived: 'yes' },
       { id: '', title: 'IDなし', date: later },
     ],
-    attendance: [{ id: 'a-1', liveId: 'l-1', memberId: 'm-1', status: '参戦', applied: '申込済み', version: '2' }],
-    tickets: [{ id: 't-1', liveId: 'l-1', memberId: 'm-1', number: 'A1', status: '余り', ticketUrl: 'https://example.com/t1', version: '3' },
+    attendance: [{ id: 'a-1', liveId: 'l-1', memberId: 'm-1', status: '参戦', applied: '申込済み', version: '2' },
+      { id: 'a-2', liveId: 'deleted-event', memberId: 'm-4', status: '参戦', applied: '', version: '1' }],
+    tickets: [{ id: 't-0', liveId: 'deleted-event', memberId: 'm-5', number: '12(さやか)', status: '捌けた', version: '1' },
+      { id: 't-1', liveId: 'l-1', memberId: 'm-1', number: 'A1', status: '余り', ticketUrl: 'https://example.com/t1', version: '3' },
       { id: 't-2', liveId: 'l-1', memberId: 'm-1', number: 'a1', status: '自分用', version: '1' }],
     settings: { line_day_time: '11:00', line_night_time: '20:00', line_day_mode: 'all', line_night_mode: 'unconfirmed' },
     devices: [{ id: crypto.randomUUID(), hash: 'h', token: 'fcm:x', enabled: true, groups: null }],
@@ -311,7 +315,12 @@ async function lineHook(body, secret = 'line-secret') {
   await rejects(call('admin@example.com', 'importData', { format: 'other' }), /形式/);
   await rejects(call('admin@example.com', 'importData', exportFile), /すでにデータ/, 409);
   const result = await call('admin@example.com', 'importData', exportFile, { replace: true });
-  assert.deepEqual(result, { members: 3, lives: 2, attendance: 1, tickets: 2, devices: 1 });
+  assert.deepEqual(result, { members: 5, lives: 2, attendance: 2, tickets: 3, devices: 1 });
+  const listed = await call('admin@example.com', 'listMembers');
+  assert.deepEqual(listed.filter(m => !m.email).map(m => m.name).sort(), ['メールなし1', 'メールなし2']);
+  // A member without an account can be given one later from the admin screen.
+  await call('admin@example.com', 'saveMember', { id: 'm-4', name: 'メールなし1', email: 'later@example.com', role: 'member', active: true });
+  assert.equal((await call('later@example.com', 'getMembers'))[0].id, 'm-4');
   // The importer is now the imported admin row; the old ID no longer matches, so the app signs in again.
   const me = (await call('admin@example.com', 'getMembers'))[0];
   assert.equal(me.id, 'm-2');
@@ -320,7 +329,8 @@ async function lineHook(body, secret = 'line-secret') {
   assert.equal(data.lives.find(l => l.id === 'l-1').version, '4');
   assert.equal(data.lives.find(l => l.id === 'l-2').archived, true);
   assert.equal(data.tickets.find(t => t.id === 't-1').ticketUrl, 'https://example.com/t1');
-  assert.equal(data.attendance[0].applied, '申込済み');
+  assert.equal(data.attendance.find(a => a.id === 'a-1').applied, '申込済み');
+  assert.ok(data.attendance.some(a => a.id === 'a-2')); assert.equal(data.tickets.find(t => t.id === 't-0').number, '12(さやか)');
   await rejects(call('stopped@example.com', 'getMembers'), /未登録/);
   assert.equal((await call('admin@example.com', 'getAdminSettings')).dayTime, '11:00');
   console.log('PASS: spreadsheet import (admin-only, explicit replace, keeps IDs/versions/archive, duplicate numbers tolerated, settings and devices)');
