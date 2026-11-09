@@ -234,7 +234,7 @@ function lineBody_(events,today,mode) {
     const pending=events.map(l=>{
       const names=members.filter(m=>{
         const record=statuses.find(a=>a.liveId===l.id&&a.memberId===m.id);
-        return !record||!['申込済み','申込不要'].includes(record.applied);
+        return !record||(record.status!=='不参加'&&!['申込済み','申込不要'].includes(record.applied));
       }).map(m=>m.name);
       return {live:l,names};
     }).filter(x=>x.names.length);
