@@ -422,6 +422,10 @@ function finishStartup(){
 function notice(s){clearTimeout(noticeTimer);$('notice').textContent=s;const inline=$('form-message');if(inline)inline.textContent=s; if(s==='保存しました'){noticeTimer=setTimeout(()=>{$('notice').textContent=''},3000)}}
 function rpc(fn,...args){return window.LivePocketTransport.call(fn,...args)}
 function showRefreshState(){const button=$('reload');if(button){button.disabled=loading;button.textContent=loading?'更新中…':'再読込'}}
+const timetableImportParam=new URLSearchParams(location.search).get('timetableImport');
+let pendingTimetableImport=null;
+try{if(timetableImportParam){const payload=JSON.parse(timetableImportParam);if(payload?.version===1&&typeof payload.title==='string'&&typeof payload.date==='string'&&typeof payload.purchaseUrl==='string'&&typeof payload.sheetUrl==='string')pendingTimetableImport={title:payload.title.slice(0,150),date:payload.date.slice(0,10),venue:String(payload.venue||'').slice(0,150),purchaseUrl:payload.purchaseUrl.slice(0,2000),sheetUrl:payload.sheetUrl.slice(0,600),groups:[]};}}catch(e){}
+function openPendingTimetableImport(){if(!pendingTimetableImport||!data||$('modal').open)return;const payload=pendingTimetableImport;pendingTimetableImport=null;const url=new URL(location.href);url.searchParams.delete('timetableImport');history.replaceState(null,'',url.pathname+url.search+url.hash);liveForm(payload);notice('タイムテーブルのイベント情報を入力しました。内容を確認して保存してください。')}
 async function refresh(){
   if(busy||sending||loading||$('modal').open)return;
   const version=++refreshVersion,requestedMember=memberId;
@@ -431,7 +435,7 @@ async function refresh(){
     if(version!==refreshVersion||memberId!==requestedMember)return;
     confirmedData=result;rebuildOptimistic();cachedView=false;cacheSnapshot();notice('');
     // A background reply must never rebuild a form the user has started editing.
-    if(!$('modal').open)render();else refreshTicketManager();
+    if(!$('modal').open){render();openPendingTimetableImport()}else refreshTicketManager();
   }catch(e){
     if(version!==refreshVersion||memberId!==requestedMember)return;
     if(!data){
