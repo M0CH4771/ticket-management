@@ -166,15 +166,26 @@ function sendDeadlinePush_() {
     resetRequest_();
     const p=pushProperties_(),config=pushConfig_(),line=lineConfig_();
     const lives=pushDueEvents_(rows_('Lives'),today);if(!lives.length)return;
-    if(line.ready&&p.getProperty('LINE_SENT_DAY')!==today) {
-      const lineAttemptDay=p.getProperty('LINE_ATTEMPT_DAY')||'',lineAttempts=Number(p.getProperty('LINE_ATTEMPTS')||0),nextAttempt=Number(p.getProperty('LINE_NEXT_ATTEMPT')||0);
-      if(!(lineAttemptDay===today&&(lineAttempts>=3||nextAttempt>Date.now()))) {
-        p.setProperty('LINE_ATTEMPT_DAY',today);p.setProperty('LINE_ATTEMPTS',String(lineAttemptDay===today?lineAttempts+1:1));p.setProperty('LINE_NEXT_ATTEMPT',String(Date.now()+15*60000));
-        try {
-          const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+line.token},muteHttpExceptions:true,payload:JSON.stringify({to:line.groupId,messages:[{type:'text',text:lineBody_(lives,today)}]})});
-          if(response.getResponseCode()===200)p.setProperty('LINE_SENT_DAY',today);
-          else p.setProperty('LINE_LAST_STATUS','HTTP '+response.getResponseCode());
-        } catch(e) { p.setProperty('LINE_LAST_STATUS','network-error'); }
+    if(line.ready) {
+      const hour=Number(Utilities.formatDate(now,'Asia/Tokyo','H'));
+      const lineSlot=hour>=21&&hour<22?'21':hour>=12&&hour<13?'12':'';
+      if(lineSlot) {
+        const sentKey='LINE_SENT_'+lineSlot+'_DAY';
+        const attemptDayKey='LINE_'+lineSlot+'_ATTEMPT_DAY';
+        const attemptsKey='LINE_'+lineSlot+'_ATTEMPTS';
+        const nextAttemptKey='LINE_'+lineSlot+'_NEXT_ATTEMPT';
+        const legacyNoonSent=lineSlot==='12'&&p.getProperty('LINE_SENT_DAY')===today;
+        const attemptDay=p.getProperty(attemptDayKey)||'',attempts=Number(p.getProperty(attemptsKey)||0),nextAttempt=Number(p.getProperty(nextAttemptKey)||0);
+        if(p.getProperty(sentKey)!==today&&!legacyNoonSent&&!(attemptDay===today&&(attempts>=3||nextAttempt>Date.now()))) {
+          p.setProperty(attemptDayKey,today);p.setProperty(attemptsKey,String(attemptDay===today?attempts+1:1));p.setProperty(nextAttemptKey,String(Date.now()+15*60000));
+          try {
+            const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+line.token},muteHttpExceptions:true,payload:JSON.stringify({to:line.groupId,messages:[{type:'text',text:lineBody_(lives,today)}]})});
+            if(response.getResponseCode()===200) {
+              p.setProperty(sentKey,today);
+              if(lineSlot==='12')p.setProperty('LINE_SENT_DAY',today);
+            } else p.setProperty('LINE_LAST_STATUS','HTTP '+response.getResponseCode());
+          } catch(e) { p.setProperty('LINE_LAST_STATUS','network-error'); }
+        }
       }
     }
     if(!config||p.getProperty('PUSH_ENABLED')!=='yes')return;
