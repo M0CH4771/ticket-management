@@ -5,27 +5,29 @@ let time=Date.parse('2026-09-24T11:59:00+09:00'),sent=[],requests=[],fetchStatus
 const props=new Map(),cache=new Map();
 const p={getProperty:k=>props.get(k)||null,setProperty:(k,v)=>{props.set(k,v);return p},deleteProperty:k=>props.delete(k),getProperties:()=>Object.fromEntries(props)};
 const D=class extends Date{constructor(...args){super(...(args.length?args:[time]))}static now(){return time}};
-const c=vm.createContext({Date:D,console,PropertiesService:{getScriptProperties:()=>p},LockService:{getUserLock:()=>({waitLock(){},tryLock:()=>true,releaseLock(){}})},Utilities:{formatDate:(d,tz,format)=>format==='H'?new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',hourCycle:'h23'}).format(d):d.toLocaleDateString('sv-SE',{timeZone:tz}),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,v)=>crypto.createHash('sha256').update(v).digest(),base64EncodeWebSafe:v=>Buffer.from(v).toString('base64url')},CacheService:{getScriptCache:()=>({remove:k=>cache.delete(k)})},UrlFetchApp:{fetch:(url,options)=>{requests.push({url,options});if(options.payload)sent.push(JSON.parse(options.payload));return {getResponseCode:()=>fetchStatus,getContentText:()=>JSON.stringify(fetchStatus===404?{error:{details:[{errorCode:'UNREGISTERED'}]}}:{name:'sent'})}}},resetRequest_(){},selectedMember_:id=>{if(id!=='me')throw Error('invalid member')},rows_:()=>lives});
+const c=vm.createContext({Date:D,console,PropertiesService:{getScriptProperties:()=>p},LockService:{getUserLock:()=>({waitLock(){},tryLock:()=>true,releaseLock(){}})},Utilities:{formatDate:(d,tz,format)=>format==='m'?String(Number(new Intl.DateTimeFormat('en-GB',{timeZone:tz,minute:'2-digit'}).format(d))):format==='H'?new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',hourCycle:'h23'}).format(d):d.toLocaleDateString('sv-SE',{timeZone:tz}),DigestAlgorithm:{SHA_256:'sha256'},computeDigest:(_,v)=>crypto.createHash('sha256').update(v).digest(),getUuid:()=>crypto.randomUUID(),base64EncodeWebSafe:v=>Buffer.from(v).toString('base64url')},CacheService:{getScriptCache:()=>({remove:k=>cache.delete(k)})},UrlFetchApp:{fetch:(url,options)=>{requests.push({url,options});if(options.payload)sent.push(JSON.parse(options.payload));return {getResponseCode:()=>fetchStatus,getContentText:()=>JSON.stringify(fetchStatus===404?{error:{details:[{errorCode:'UNREGISTERED'}]}}:{name:'sent'})}}},resetRequest_(){},authenticatedMember_:token=>{if(token!=='tok')throw Error('login required');return {id:'me',name:'Me',active:'yes',role:'member'}},selectedMember_:(id,token)=>{if(token!=='tok')throw Error('login required');if(id!=='me')throw Error('invalid member')},rows_:()=>lives});
 vm.runInContext(code.slice(code.indexOf('function normalizeDate_('),code.indexOf('function normalizeSheetDates_(')),c);
+vm.runInContext(code.slice(code.indexOf('function adminSettings_('),code.indexOf('function getAdminSettings(')),c);
 vm.runInContext(source,c);c.pushAccessToken_=()=> 'test-token';
 let lineEnableCalled=false;c.installLineNotifications_=()=>{lineEnableCalled=true};
 c.Session={getActiveUser:()=>({getEmail:()=> 'admin@example.com'}),getEffectiveUser:()=>({getEmail:()=> 'admin@example.com'})};
 c.enableLineNotifications();assert.equal(lineEnableCalled,true);
 c.Session={getActiveUser:()=>({getEmail:()=> 'other@example.com'}),getEffectiveUser:()=>({getEmail:()=> 'admin@example.com'})};
 assert.throws(()=>c.enableLineNotifications(),/管理者アカウント/);
-assert.equal(c.getPushSettings().ready,false);
+assert.throws(()=>c.getPushSettings('bad'),/login/);assert.throws(()=>c.savePushSubscription('tok','someone-else',{}),/invalid member/);
+assert.equal(c.getPushSettings('tok').ready,false);
 p.setProperty('PUSH_FIREBASE_CONFIG',JSON.stringify({apiKey:'public-key',projectId:'project',messagingSenderId:'123',appId:'app',private_key:'must-not-leak'}));
 p.setProperty('PUSH_VAPID_PUBLIC_KEY','A'.repeat(87));p.setProperty('PUSH_SERVICE_ACCOUNT',JSON.stringify({project_id:'project',client_email:'service@example.com',private_key:'PRIVATE'}));p.setProperty('PUSH_ENABLED','yes');
-assert.equal(c.getPushSettings().ready,true);assert(!JSON.stringify(c.getPushSettings()).includes('PRIVATE'));assert(!JSON.stringify(c.getPushSettings()).includes('private_key'));
+assert.equal(c.getPushSettings('tok').ready,true);assert(!JSON.stringify(c.getPushSettings('tok')).includes('PRIVATE'));assert(!JSON.stringify(c.getPushSettings('tok')).includes('private_key'));
 const device={id:'00000000-0000-0000-0000-000000000001',secret:'a'.repeat(64),token:'fcm:token'};
-c.savePushSubscription('me',device);assert.throws(()=>c.removePushSubscription(device.id,'b'.repeat(64)),/一致/);
+c.savePushSubscription('tok','me',device);assert.throws(()=>c.removePushSubscription('tok',device.id,'b'.repeat(64)),/一致/);
 lives=[{id:'one',title:'Test event',date:'2026-10-15',lotteryDeadline:'9/24',requiredThrows:'3'},{id:'past',title:'past',date:'2026-09-23',lotteryDeadline:'2026-09-24'}];
 c.sendDeadlinePush_();assert.equal(sent.length,0);
 time=Date.parse('2026-09-24T12:00:00+09:00');c.sendDeadlinePush_();assert.equal(sent.length,1);assert.match(sent[0].message.data.body,/Test event／投げ数 3枚/);assert(!sent[0].message.data.body.includes('past'));assert.equal(sent[0].message.webpush.headers.TTL,'43199');
-c.sendDeadlinePush_();assert.equal(sent.length,1);c.savePushSubscription('me',device);c.sendDeadlinePush_();assert.equal(sent.length,1);
-c.removePushSubscription(device.id,device.secret);assert.equal(JSON.parse(p.getProperty('PUSH_DEVICE_'+device.id)).enabled,false);
+c.sendDeadlinePush_();assert.equal(sent.length,1);c.savePushSubscription('tok','me',device);c.sendDeadlinePush_();assert.equal(sent.length,1);
+c.removePushSubscription('tok',device.id,device.secret);assert.equal(JSON.parse(p.getProperty('PUSH_DEVICE_'+device.id)).enabled,false);
 // New day, opt-in again, transient retry is delayed and successful sends deduplicate.
-time=Date.parse('2026-09-25T12:00:00+09:00');lives[0].lotteryDeadline='2026-09-25';c.savePushSubscription('me',device);fetchStatus=503;c.sendDeadlinePush_();assert.equal(sent.length,2);c.sendDeadlinePush_();assert.equal(sent.length,2);time+=16*60000;fetchStatus=200;c.sendDeadlinePush_();assert.equal(sent.length,3);c.sendDeadlinePush_();assert.equal(sent.length,3);
+time=Date.parse('2026-09-25T12:00:00+09:00');lives[0].lotteryDeadline='2026-09-25';c.savePushSubscription('tok','me',device);fetchStatus=503;c.sendDeadlinePush_();assert.equal(sent.length,2);c.sendDeadlinePush_();assert.equal(sent.length,2);time+=16*60000;fetchStatus=200;c.sendDeadlinePush_();assert.equal(sent.length,3);c.sendDeadlinePush_();assert.equal(sent.length,3);
 // Year crossing, deleted/empty days, and expired subscriptions.
 assert.equal(c.pushDueEvents_([{id:'jan',title:'Jan',date:'2027-01-05',lotteryDeadline:'12/31'}],'2026-12-31').length,1);
 lives=[];time+=86400000;c.sendDeadlinePush_();assert.equal(sent.length,3);
@@ -38,19 +40,19 @@ lives=[
  {id:'other',title:'C only',date:'2026-10-02',lotteryDeadline:'2026-09-27',groups:'["C"]',requiredThrows:'2'},
  {id:'untagged',title:'No tags',date:'2026-10-03',lotteryDeadline:'2026-09-27',groups:''}
 ];
-assert.throws(()=>c.savePushSubscription('me',{...device,groups:[]}),/1つ以上/);
-c.savePushSubscription('me',{...device,groups:['A','B','A']});
-assert.equal(c.getPushSettings(device.id,device.secret,true).selectedGroups.join(','),'A,B');
-assert.throws(()=>c.getPushSettings(device.id,'b'.repeat(64),true),/一致/);
-c.savePushSubscription('me',device); // Old clients/token refresh omit groups; preserve server preference.
-assert.equal(c.getPushSettings(device.id,device.secret,true).selectedGroups.join(','),'A,B');
+assert.throws(()=>c.savePushSubscription('tok','me',{...device,groups:[]}),/1つ以上/);
+c.savePushSubscription('tok','me',{...device,groups:['A','B','A']});
+assert.equal(c.getPushSettings('tok',device.id,device.secret,true).selectedGroups.join(','),'A,B');
+assert.throws(()=>c.getPushSettings('tok',device.id,'b'.repeat(64),true),/一致/);
+c.savePushSubscription('tok','me',device); // Old clients/token refresh omit groups; preserve server preference.
+assert.equal(c.getPushSettings('tok',device.id,device.secret,true).selectedGroups.join(','),'A,B');
 c.sendDeadlinePush_();assert.equal(sent.length,1);assert.equal(sent[0].message.data.title,'本日抽選締切（1件）');
 assert.equal(sent[0].message.data.body.split('A and B live').length-1,1);assert(!sent[0].message.data.body.includes('C only'));
 c.sendDeadlinePush_();assert.equal(sent.length,1);
 // Nonmatching devices must not occupy the batch and starve other subscribers.
-for(let i=2;i<=12;i++)c.savePushSubscription('me',{id:'00000000-0000-0000-0000-'+String(i).padStart(12,'0'),secret:'a'.repeat(64),token:'token'+i,groups:['Absent']});
+for(let i=2;i<=12;i++)c.savePushSubscription('tok','me',{id:'00000000-0000-0000-0000-'+String(i).padStart(12,'0'),secret:'a'.repeat(64),token:'token'+i,groups:['Absent']});
 const all={id:'00000000-0000-0000-0000-000000000013',secret:'a'.repeat(64),token:'all'};
-c.savePushSubscription('me',{...all,groups:null});c.sendDeadlinePush_();assert.equal(sent.length,2);assert.equal(sent[1].message.data.title,'本日抽選締切（3件）');
+c.savePushSubscription('tok','me',{...all,groups:null});c.sendDeadlinePush_();assert.equal(sent.length,2);assert.equal(sent[1].message.data.title,'本日抽選締切（3件）');
 assert(!JSON.parse(p.getProperty('PUSH_DEVICE_00000000-0000-0000-0000-000000000002')).sentDay);
 // Untagged/invalid group data never matches a selected group; all still includes it.
 assert.equal(c.pushFilterEvents_(lives,['Missing']).length,0);assert.equal(c.pushFilterEvents_(lives,null).length,3);
@@ -62,16 +64,42 @@ const lineLives=[
  {id:'line2',title:'LINE B live',date:'2026-10-11',lotteryDeadline:'2026-09-27',groups:'["B"]',requiredThrows:'2',purchaseUrl:'https://example.test/ticket-b'},
  {id:'line3',title:'LINE C live',date:'2026-10-12',lotteryDeadline:'2026-09-27',groups:'["C"]',requiredThrows:'1',purchaseUrl:'https://example.test/ticket-c'}
 ];lives=lineLives;time=Date.parse('2026-09-27T12:05:00+09:00');
-const publicSettings=JSON.stringify(c.getPushSettings(null,null,true));assert(!publicSettings.includes('secret-line-token'));assert(!publicSettings.includes('C-group-id'));
+const publicSettings=JSON.stringify(c.getPushSettings('tok',null,null,true));assert(!publicSettings.includes('secret-line-token'));assert(!publicSettings.includes('C-group-id'));
 assert(!publicSettings.includes('lineNotification'));
 const beforeLine=requests.length;c.sendDeadlinePush_();
 const lineRequest=requests.slice(beforeLine).find(r=>r.url==='https://api.line.me/v2/bot/message/push');assert(lineRequest);
 const lineText=JSON.parse(lineRequest.options.payload).messages[0].text;
 assert.match(lineText,/【本日締切】/);assert.match(lineText,/開催日：2026\/10\/10/);assert.match(lineText,/イベント名：LINE A and B live/);assert.match(lineText,/チケットURL：https:\/\/example\.test\/ticket-a/);assert.match(lineText,/枠数：3枚/);
 assert.match(lineText,/イベント名：LINE B live/);assert.match(lineText,/イベント名：LINE C live/);
+assert.match(lineRequest.options.headers['X-Line-Retry-Key'],/^[0-9a-f-]{36}$/);
 assert.equal(p.getProperty('LINE_SENT_DAY'),'2026-09-27');c.sendDeadlinePush_();assert.equal(requests.filter(r=>r.url==='https://api.line.me/v2/bot/message/push').length,1);
 console.log('PASS: per-device selections, same event with multiple selected groups once, all-groups mode, no-match skip, batch fairness, old-client preservation, credential checks');
 console.log('PASS: noon JST, no early/empty/past sends, date normalization, receipts, transient retry, opt-out ownership, expired tokens, public config excludes credentials');
+// A lost response is retried with the same X-Line-Retry-Key; 409 means LINE already accepted it.
+{
+ const lineCalls=()=>requests.filter(r=>r.url==='https://api.line.me/v2/bot/message/push');
+ time=Date.parse('2026-09-27T21:05:00+09:00');fetchStatus=503;c.sendDeadlinePush_();
+ const firstKey=lineCalls().at(-1).options.headers['X-Line-Retry-Key'];
+ assert.notEqual(firstKey,lineRequest.options.headers['X-Line-Retry-Key']); // night slot has its own key
+ time+=16*60000;fetchStatus=409;c.sendDeadlinePush_();
+ assert.equal(lineCalls().at(-1).options.headers['X-Line-Retry-Key'],firstKey);
+ assert.equal(p.getProperty('LINE_SENT_NIGHT_DAY'),'2026-09-27');
+ const count=lineCalls().length;time+=16*60000;fetchStatus=200;c.sendDeadlinePush_();assert.equal(lineCalls().length,count);
+}
+// A device re-registered during delivery keeps its new token (no stale write-back).
+{
+ for(const key of [...props.keys()])if(key.startsWith('PUSH_DEVICE_'))props.delete(key);
+ p.deleteProperty('LINE_ENABLED');p.setProperty('PUSH_ENABLED','yes');
+ time=Date.parse('2026-09-28T12:00:00+09:00');lives=[{id:'race',title:'Race',date:'2026-10-01',lotteryDeadline:'2026-09-28'}];
+ const raceDevice={id:'00000000-0000-0000-0000-000000000099',secret:'c'.repeat(64),token:'old-token'};
+ c.savePushSubscription('tok','me',raceDevice);
+ const fetch=c.UrlFetchApp.fetch;
+ c.UrlFetchApp.fetch=(url,options)=>{c.savePushSubscription('tok','me',{...raceDevice,token:'new-token'});return fetch(url,options)};
+ c.sendDeadlinePush_();c.UrlFetchApp.fetch=fetch;
+ const stored=JSON.parse(p.getProperty('PUSH_DEVICE_'+raceDevice.id));
+ assert.equal(stored.token,'new-token');assert.equal(stored.enabled,true);
+}
+console.log('PASS: LINE retry key reuse and 409 handling, concurrent re-registration is not overwritten');
 console.log('PASS: one fixed LINE destination, all due events aggregated into one message per day, and no server secrets in public settings');
 (async()=>{
  const handlers={},shown=[],opened=[];

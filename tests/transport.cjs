@@ -2,15 +2,17 @@ const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/st
 (async()=>{
 let handler,frame,seq=0,timer=0;const timers=new Map(),sent=[];
 const peer={postMessage:(message,origin)=>sent.push({message,origin})};
-const context={URL,Set,Map,Promise,Error,crypto:{randomUUID:()=>`00000000-0000-0000-0000-${String(++seq).padStart(12,'0')}`},setTimeout:(cb)=>{timers.set(++timer,cb);return timer},clearTimeout:id=>timers.delete(id),window:{LIVE_POCKET_CONFIG:{gasUrl:'https://script.google.com/macros/s/example/exec'},addEventListener:(_,fn)=>handler=fn,removeEventListener(){}},document:{createElement:()=>({setAttribute(){},remove(){}}),body:{appendChild:x=>frame=x}}};
+const context={URL,Set,Map,Promise,Error,crypto:{randomUUID:()=>`00000000-0000-0000-0000-${String(++seq).padStart(12,'0')}`},setTimeout:(cb)=>{timers.set(++timer,cb);return timer},clearTimeout:id=>timers.delete(id),window:{LivePocketAuth:{getIdToken:async()=>'test-id-token'},LIVE_POCKET_CONFIG:{gasUrl:'https://script.google.com/macros/s/example/exec'},addEventListener:(_,fn)=>handler=fn,removeEventListener(){}},document:{createElement:()=>({setAttribute(){},remove(){}}),body:{appendChild:x=>frame=x}}};
 vm.createContext(context);vm.runInContext(fs.readFileSync(__dirname+'/../docs/transport.js','utf8'),context);
 const result=context.window.LivePocketTransport.call('getMembers');
+await new Promise(setImmediate);
 const channel=new URL(frame.src).searchParams.get('channel');
 handler({origin:'https://evil.example',source:peer,data:{type:'live-pocket-ready',channel}});
 assert.equal(sent.length,0);
 handler({origin:'https://n-test-script.googleusercontent.com',source:peer,data:{type:'live-pocket-ready',channel}});
 await new Promise(setImmediate);assert.equal(sent.length,1);
-const request=sent[0].message;let done=false;result.then(()=>done=true);
+const request=sent[0].message;assert.equal(request.args[0],'test-id-token'); // ID token is passed only as an RPC argument.
+assert.ok(!frame.src.includes('test-id-token'));let done=false;result.then(()=>done=true);
 handler({origin:sent[0].origin,source:{},data:{type:'live-pocket-result',channel,id:request.id,ok:true,value:'bad'}});
 await new Promise(setImmediate);assert.equal(done,false);
 handler({origin:sent[0].origin,source:peer,data:{type:'live-pocket-result',channel,id:request.id,ok:true,value:[{id:'1',name:'test'}]}});

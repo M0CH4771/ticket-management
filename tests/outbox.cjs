@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const script=fs.readFileSync(__dirname+'/../docs/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
 const values=new Map(),calls=[],notices=[];let quota=false,lockAllowed=true;
 const modal={open:true,close(){this.open=false}};
-const c=vm.createContext({crypto,sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},localStorage:{getItem:k=>values.get(k)||null,setItem(k,v){if(quota)throw Error('quota');values.set(k,v)},removeItem:k=>values.delete(k)},navigator:{locks:{request:async(k,o,fn)=>fn(lockAllowed?{}:null)}},window:{LIVE_POCKET_CONFIG:{gasUrl:'endpoint'},scrollTo(){},scrollY:0},document:{getElementById:id=>id==='modal'?modal:null,querySelectorAll:()=>[]}});
+const c=vm.createContext({performance:{now:()=>0},URLSearchParams,location:{pathname:"/",search:""},crypto,sessionStorage:{getItem:()=>null,setItem(){},removeItem(){}},localStorage:{getItem:k=>values.get(k)||null,setItem(k,v){if(quota)throw Error('quota');values.set(k,v)},removeItem:k=>values.delete(k)},navigator:{locks:{request:async(k,o,fn)=>fn(lockAllowed?{}:null)}},window:{LIVE_POCKET_CONFIG:{gasUrl:'endpoint'},scrollTo(){},scrollY:0},document:{getElementById:id=>id==='modal'?modal:null,querySelectorAll:()=>[]}});
 vm.runInContext(script.slice(0,script.indexOf('function showSetup()')),c);
 c.render=()=>{};c.notice=s=>notices.push(s);c.cacheSnapshot=()=>{};
 c.rpc=(...args)=>new Promise((resolve,reject)=>calls.push({args,resolve,reject}));

@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const script=fs.readFileSync(__dirname+'/../docs/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
-const values=new Map(),c=vm.createContext({localStorage:{getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)},sessionStorage:{removeItem(){}},document:{querySelectorAll:()=>[]},window:{}});
+const values=new Map(),c=vm.createContext({performance:{now:()=>0},URLSearchParams,location:{pathname:"/",search:""},localStorage:{getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)},sessionStorage:{removeItem(){}},document:{querySelectorAll:()=>[]},window:{}});
 vm.runInContext(script.slice(0,script.indexOf('function showSetup()')),c);
 const run=s=>vm.runInContext(s,c);
 values.set('ticket-management-event-suggestions-v1',JSON.stringify({titles:['過去のライブ','Ｆｏｏ','過去のライブ'],venues:['過去の会場','Hall']}));

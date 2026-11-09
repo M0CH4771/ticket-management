@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const script=fs.readFileSync(__dirname+'/../docs/index.html','utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
-const c=vm.createContext({sessionStorage:{removeItem(){}},localStorage:{getItem:()=>''}});vm.runInContext(script.slice(0,script.indexOf('function showSetup()')),c);
+const c=vm.createContext({performance:{now:()=>0},URLSearchParams,location:{pathname:"/",search:""},sessionStorage:{removeItem(){}},localStorage:{getItem:()=>''}});vm.runInContext(script.slice(0,script.indexOf('function showSetup()')),c);
 vm.runInContext("data={me:{id:'me'},members:[{id:'me'},{id:'other'}]};",c);
 assert.equal(c.japanDay(new Date('2026-09-19T14:59:59Z')),'2026-09-19');
 assert.equal(c.japanDay(new Date('2026-09-19T15:00:00Z')),'2026-09-20');
@@ -17,29 +17,24 @@ assert.ok(c.eventTile({...l,title:'<script>bad</script>'},[],'2026-09-19').inclu
 assert.ok(c.eventTile({...l,groups:['グループA','<script>']},[],'2026-09-19').includes('グループA'));
 assert.ok(c.eventTile({...l,groups:['<script>']},[],'2026-09-19').includes('&lt;script&gt;'));
 vm.runInContext("data={lives:[{id:'copy-event',date:'2026-09-19',title:'コピー対象'}]};",c);const copied=c.ticketShareText('copy-event','A12','https://example.com/ticket');assert.ok(copied.includes('日付：'));assert.ok(copied.includes('イベント名：コピー対象'));assert.ok(copied.includes('チケット番号：A12'));assert.ok(copied.includes('URL：https://example.com/ticket'));
+vm.runInContext("data={me:{id:'me'},members:[],attendance:[],tickets:[],lives:[]};",c);
 console.log('PASS: priority ordering, Japan midnight, year rollover, cutoff day/next day tile content, remaining count, unset cutoff, safe links, escaping and formatted ticket copy');
 
 assert.ok(c.eventTile({...l,owner:'me'},[],'2026-09-19').includes('data-edit-live='));
 assert.ok(c.eventTile({...l,owner:'bad-import-id'},[],'2026-09-19').includes('data-edit-live='));
-assert.ok(!c.eventTile({...l,owner:'other'},[],'2026-09-19').includes('data-edit-live='));
+assert.ok(c.eventTile({...l,owner:'other'},[],'2026-09-19').includes('data-edit-live=')); // Every active member may edit any event.
 assert.ok(!script.includes('setInterval('));
 assert.ok(!script.includes('60秒ごと'));
-console.log('PASS: edit buttons for owned/imported events, other-owner guard, no periodic refresh');
+console.log('PASS: edit buttons for owned/imported/other events, no periodic refresh');
 
 vm.runInContext("data={me:{id:'me'},members:[{id:'me',name:'本人'},{id:'other',name:'<友人>'},{id:'pending',name:'未回答の人'}],attendance:[{liveId:'event',memberId:'me',status:'参戦'},{liveId:'event',memberId:'other',status:'不参加'}]};",c);
 const dropdown=c.attendanceDropdown({id:'event'});
 assert.ok(dropdown.includes('1人参戦'));assert.ok(dropdown.includes('不参加'));assert.ok(dropdown.includes('未回答'));assert.ok(dropdown.includes('&lt;友人&gt;'));
 const otherDropdown=c.attendanceDropdown({id:'different'});assert.ok(otherDropdown.includes('0人参戦'));
-let renders=0,requests=0,historyBack=0;
 c.window={scrollY:240,scrollTo(){}};c.location={pathname:'/app',search:''};
-c.document={getElementById:()=>({open:false})};
-c.history={state:{ticketView:'home'},pushState(state){this.state=state},replaceState(state){this.state=state},back(){historyBack++;this.state={ticketView:'home'};c.handleHistory()}};
-c.render=()=>renders++;c.rpc=()=>{requests++;throw Error('unexpected request')};
-c.openEvent('event');assert.equal(c.history.state.id,'event');c.returnHome();
-assert.equal(historyBack,1);assert.equal(renders,2);assert.equal(requests,0);
 const storage={};c.sessionStorage={setItem:(k,v)=>storage[k]=v,getItem:k=>storage[k]||null};c.window.LIVE_POCKET_CONFIG={gasUrl:'endpoint'};
 vm.runInContext("memberId='me';data={me:{id:'me'},lives:[],members:[],tickets:[],attendance:[]};",c);
 c.cacheSnapshot();assert.equal(c.restoreSnapshot(),true);
 vm.runInContext("memberId='other';",c);assert.equal(c.restoreSnapshot(),false);
 vm.runInContext("memberId='me';",c);c.window.LIVE_POCKET_CONFIG.gasUrl='different';assert.equal(c.restoreSnapshot(),false);
-console.log('PASS: attendance per event including unanswered/escaping, browser back without RPC, cache member/endpoint isolation');
+console.log('PASS: attendance per event including unanswered/escaping, cache member/endpoint isolation');

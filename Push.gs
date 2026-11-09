@@ -60,9 +60,8 @@ function pushIdentity_(id,secret) {
   return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,secret));
 }
 function savePushSubscription(idToken,memberId,device) {
-  authenticatedMember_(idToken);
+  selectedMember_(memberId,idToken);
   if(!pushConfig_()||pushProperties_().getProperty('PUSH_ENABLED')!=='yes') throw new Error('通知は管理者の初期設定待ちです');
-  resetRequest_();selectedMember_(memberId,idToken);
   const hash=pushIdentity_(device?.id,device?.secret);
   if(typeof device.token!=='string'||!device.token||device.token.length>2000||!/^[A-Za-z0-9_:.-]+$/.test(device.token)) throw new Error('通知の宛先が無効です');
   const lock=LockService.getUserLock();lock.waitLock(10000);
@@ -185,9 +184,14 @@ function sendDeadlinePush_() {
         const attemptDay=p.getProperty(attemptDayKey)||'',attempts=Number(p.getProperty(attemptsKey)||0),nextAttempt=Number(p.getProperty(nextAttemptKey)||0);
         if(p.getProperty(sentKey)!==today&&!legacySentToday&&!(attemptDay===today&&(attempts>=3||nextAttempt>Date.now()))) {
           p.setProperty(attemptDayKey,today);p.setProperty(attemptsKey,String(attemptDay===today?attempts+1:1));p.setProperty(nextAttemptKey,String(Date.now()+15*60000));
+          // One retry key per slot and day: if a response was lost after LINE accepted
+          // the message, the retry is answered with 409 instead of posting it twice.
+          const retryKeyName='LINE_'+lineSlot.toUpperCase()+'_RETRY_KEY';
+          let retry=JSON.parse(p.getProperty(retryKeyName)||'null');
+          if(!retry||retry.day!==today){retry={day:today,key:Utilities.getUuid()};p.setProperty(retryKeyName,JSON.stringify(retry));}
           try {
-            const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+line.token},muteHttpExceptions:true,payload:JSON.stringify({to:line.groupId,messages:[{type:'text',text:lineBody_(lives,today,lineSlot==='day'?settings.dayMode:settings.nightMode)}]})});
-            if(response.getResponseCode()===200) {
+            const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+line.token,'X-Line-Retry-Key':retry.key},muteHttpExceptions:true,payload:JSON.stringify({to:line.groupId,messages:[{type:'text',text:lineBody_(lives,today,lineSlot==='day'?settings.dayMode:settings.nightMode)}]})});
+            if(response.getResponseCode()===200||response.getResponseCode()===409) {
               p.setProperty(sentKey,today);
               if(lineSlot==='day')p.setProperty('LINE_SENT_DAY',today);
             } else p.setProperty('LINE_LAST_STATUS','HTTP '+response.getResponseCode());
@@ -201,11 +205,18 @@ function sendDeadlinePush_() {
     if(!due.length)return;
     const access=pushAccessToken_();
     const ttl=Math.max(0,Math.floor((Date.parse(today+'T23:59:59+09:00')-Date.now())/1000));if(!ttl)return;
+    // A device may be re-registered or turned off while this trigger runs. Merge only
+    // delivery fields into the latest stored record instead of writing back a stale copy.
+    const updateDelivery=(key,token,patch)=>{
+      const current=JSON.parse(p.getProperty(key)||'null');
+      if(!current||current.token!==token)return;
+      p.setProperty(key,JSON.stringify({...current,...patch}));
+    };
     for(const d of due) {
       const {key,events,...record}=d;
       record.attempts=d.attemptDay===today?(d.attempts||0)+1:1;
       record.attemptDay=today;record.nextAttempt=Date.now()+15*60000;
-      p.setProperty(key,JSON.stringify(record));
+      updateDelivery(key,d.token,{attempts:record.attempts,attemptDay:record.attemptDay,nextAttempt:record.nextAttempt});
       try {
         const response=UrlFetchApp.fetch('https://fcm.googleapis.com/v1/projects/'+encodeURIComponent(config.config.projectId)+'/messages:send',{
           method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+access},muteHttpExceptions:true,
@@ -221,7 +232,10 @@ function sendDeadlinePush_() {
           if(status===401||status===403)CacheService.getScriptCache().remove('push-access-'+config.config.projectId);
         }
       } catch(e) { record.lastStatus='network-error'; }
-      p.setProperty(key,JSON.stringify(record));
+      const patch={lastStatus:record.lastStatus};
+      if(record.sentDay===today)patch.sentDay=today;
+      if(record.enabled===false){patch.enabled=false;patch.token='';}
+      updateDelivery(key,d.token,patch);
     }
     p.setProperty('PUSH_LAST_RUN',now.toISOString());
   } finally { lock.releaseLock(); }
