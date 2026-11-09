@@ -2,420 +2,12 @@
 <link rel="icon" type="image/png" href="./icons/ticket-management.png?v=3">
 <link rel="apple-touch-icon" sizes="180x180" href="./icons/ticket-management.png?v=3">
 <link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#fffdf9">
+<meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ticket Management">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
-<style>
-:root{font-family:Inter,'Noto Sans JP',system-ui,sans-serif;color:#17191d;background:#f4f5f7;font-size:16px;font-synthesis:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
-*{box-sizing:border-box}[hidden]{display:none!important}body{margin:0}button,input,select,textarea{font:inherit}button,a,input,select,textarea,summary{touch-action:manipulation}button,a{-webkit-tap-highlight-color:transparent}button{cursor:pointer;border:1px solid #bcc3ce;background:white;color:#252830;border-radius:12px;padding:12px 16px;min-height:48px;font-weight:700;line-height:1.4}button:hover{background:#eef3ff}button:disabled{opacity:.55;cursor:wait}.primary{background:#175cd3;color:white;border-color:#175cd3}.primary:hover{background:#124aa8}a{color:#175cd3;text-underline-offset:4px}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #175cd3;outline-offset:3px}input:focus,select:focus,textarea:focus{outline:3px solid #d9e6ff;border-color:#175cd3}header{background:#17191d;color:white;padding:20px max(20px,calc((100vw - 1160px)/2));display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-size:18px;font-weight:850;letter-spacing:0;white-space:nowrap}.brand small{display:block;color:#4b515b;font-size:12px;margin-top:6px;letter-spacing:0}#account{display:flex;align-items:center;gap:10px;min-width:0;font-size:14px}#account .account-name{max-width:180px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.role-badge{border:1px solid #657080;border-radius:999px;padding:4px 9px;color:#dce5f2;font-size:12px;font-weight:750;white-space:nowrap}#permissions-help{min-height:40px;padding:6px 10px;background:transparent;color:#fff;border-color:#657080;font-size:13px}#logout{min-height:44px;padding:8px 12px;background:transparent;color:white;border-color:#555d69;font-size:14px}main{max-width:1200px;margin:auto;padding:28px 20px}.top,.row{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}h1{font-size:28px;letter-spacing:-.03em;margin:0 0 8px}h2{font-size:20px;margin:0}p{line-height:1.7}.muted{color:#4b515b;font-size:14px}.card{background:white;border:1px solid #cdd1d8;border-radius:18px;padding:24px}.date{font-size:14px;font-weight:750;letter-spacing:.04em;color:#175cd3}.event-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:20px}.event-tile{display:flex;flex-direction:column;gap:12px;min-width:0;box-shadow:0 3px 12px #20242b04}.event-tile h2{font-size:21px;line-height:1.5;overflow-wrap:anywhere}.event-tile p{margin:0}.event-tile .date{font-size:16px}.event-tile dl{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;margin:2px 0 0;background:#f4f5f7;border-radius:12px;padding:14px}.event-tile dt{font-size:14px;color:#4b515b;line-height:1.6}.event-tile dt:nth-of-type(1){grid-column:1;grid-row:1}.event-tile dt:nth-of-type(2){grid-column:2;grid-row:1}.event-tile dd{margin:5px 0 0;font-size:18px;font-weight:750;overflow-wrap:anywhere;grid-row:2}.event-tile dd:nth-of-type(1){grid-column:1}.event-tile dd:nth-of-type(2){grid-column:2}.event-tile a,.detail-page .card>a,.detail-page .card>p>a{display:flex;align-items:center;justify-content:center;min-height:48px;border:1px solid #cdd1d8;border-radius:12px;padding:10px 12px;line-height:1.5;text-decoration:none;background:#f5f6f8;overflow-wrap:anywhere;font-size:15px;font-weight:650}.event-tile button{width:100%;margin-top:auto;background:#17191d;border-color:#17191d;color:white}.event-tile.today{border-top:4px solid #175cd3}.event-tile.deadline{border-top:4px solid #c45b08}.badge{font-size:14px;border-radius:7px;display:inline-block;padding:5px 9px;background:#eceef2;color:#424954;line-height:1.4}.badge.available{background:#e8f3ed;color:#13613a}.badge.pending{background:#fff0df;color:#8c3c00}.badge.done{background:#ebf1ff;color:#24478e}.event-tile .badge{align-self:flex-start}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:22px 0}.stat{background:#f1f3f6;border-radius:12px;padding:14px}.stat b{font-size:28px;display:block}.stat span{font-size:14px;color:#4b515b}.chips{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.chip{font-size:14px;padding:10px 12px;min-height:44px}.chip.active{background:#20242b;color:white;border-color:#20242b}.ticket{border-top:1px solid #cdd1d8;padding:18px 0;display:grid;grid-template-columns:minmax(70px,.7fr) minmax(0,1.5fr) auto;align-items:center;gap:12px}.num{font-weight:850;font-size:23px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.ticket-body{min-width:0}.ticket-body p{margin:5px 0;overflow-wrap:anywhere}.ticket button{font-size:14px;padding:10px 12px;min-height:48px}.empty{text-align:center;padding:44px 15px;color:#4b515b}.people{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.person{background:#f1f3f6;border-radius:8px;font-size:14px;padding:10px 12px;overflow-wrap:anywhere}.section{margin-top:22px}.note{white-space:pre-wrap;overflow-wrap:anywhere}.login{max-width:440px;margin:6vh auto}label{display:block;font-size:14px;font-weight:700;margin:18px 0 8px;line-height:1.6}input,select,textarea{width:100%;min-width:0;min-height:50px;border:1px solid #aeb7c4;border-radius:11px;padding:12px;background:white;color:#20242b;font-size:16px;line-height:1.5}textarea{min-height:120px;resize:vertical}input[type=date]{appearance:none;-webkit-appearance:none}dialog{border:0;border-radius:22px;padding:0;width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 40px);box-shadow:0 25px 100px #20242b44;overflow:auto;overscroll-behavior:contain}dialog::backdrop{background:#101d37a8}body:has(dialog[open]){overflow:hidden}dialog .modal-head{position:sticky;top:0;background:white;padding:22px 24px 16px;z-index:2;border-bottom:1px solid #cdd1d8}dialog .modal-body{padding:0 24px 20px}dialog .modal-actions{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 2fr;gap:12px;padding:14px 24px max(14px,env(safe-area-inset-bottom));background:white;border-top:1px solid #cdd1d8;z-index:2}.modal-context{margin:7px 0 0;font-size:14px;color:#4b515b;overflow-wrap:anywhere}.form-message{color:#9b2530;background:#fff0f1;border-radius:9px;padding:10px 12px;margin:0 24px 12px;font-size:14px;line-height:1.6}.form-message:empty{display:none}.preview-count{font-size:14px;color:#175cd3;background:#edf3ff;padding:10px 12px;border-radius:9px}.danger{color:#a62435}#notice{position:fixed;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:20;background:#20242b;color:white;padding:12px 18px;border-radius:12px;font-size:14px;box-shadow:0 5px 30px #20242b20;max-width:calc(100vw - 32px);width:max-content;pointer-events:none}#notice:empty{display:none}body:has(.mobile-action) #notice{bottom:100px}.actions{display:flex;gap:8px}.foot{margin-top:20px;font-size:12px;color:#4b515b}.search{margin:8px 0 0;background:white}.detail-page{max-width:850px;margin:18px auto}.back{margin-top:20px}summary{cursor:pointer;min-height:44px;padding:12px 0;font-size:14px;font-weight:700;line-height:1.6}.members-panel{margin-top:14px;border-top:1px solid #cdd1d8}.mobile-action{display:none}.form-hint{margin:6px 0 0}.required{color:#a62435;font-size:12px;margin-left:6px}
-@media(max-width:1000px){.event-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:620px){header{padding:14px 16px;flex-wrap:wrap}.brand{font-size:16px}.brand small{font-size:11px}#account{gap:6px;flex-wrap:wrap;justify-content:flex-end}#account .account-name{max-width:80px}#logout{padding:8px}main{padding:22px 16px max(24px,env(safe-area-inset-bottom))}.top .date{display:none}h1{font-size:25px;margin:0}.top .actions{width:100%}.actions #reload{flex:1}.actions #new-live{flex:2}.event-grid{grid-template-columns:1fr;gap:14px;margin-top:16px}.event-tile{padding:18px;gap:10px}.event-tile h2{font-size:20px}.event-tile dl{padding:12px}.card{padding:18px}.stat{padding:12px 8px;text-align:center}.stat b{font-size:25px}.stat span{font-size:13px}.ticket{gap:10px;grid-template-columns:minmax(66px,.8fr) minmax(0,1.6fr) auto}.num{font-size:21px}.ticket button{padding:10px}.chips{flex-wrap:nowrap;overflow-x:auto;padding:2px 0 8px;scrollbar-width:thin}.chip{flex:0 0 auto}.detail-page{margin:16px 0}.detail-page .section>.row{align-items:center}.detail-page #add{display:none}.mobile-action{display:block;position:fixed;bottom:0;left:0;right:0;z-index:10;padding:12px 16px max(12px,env(safe-area-inset-bottom));background:#ffffffed;border-top:1px solid #cdd1d8;backdrop-filter:blur(12px)}.mobile-action button{width:100%}body:has(.mobile-action) main{padding-bottom:110px}.person{width:100%}dialog{width:100%;max-width:100%;margin:auto 0 0;max-height:94dvh;border-radius:22px 22px 0 0}dialog .modal-head{padding:20px 20px 14px}dialog .modal-body{padding:0 20px 16px}dialog .modal-actions{padding-left:20px;padding-right:20px}.form-message{margin-left:20px;margin-right:20px}.login{margin:28px auto}.login h1{font-size:25px}}
-@media(prefers-reduced-motion:no-preference){button,a{transition:background .15s,border-color .15s}dialog[open]{animation:appear .16s ease-out}@keyframes appear{from{opacity:.5;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}}
-.event-tile .edit-event{margin-top:0;background:white;color:#175cd3;border-color:#bcc3ce}
-.group-tags{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}.group-tag{border:1px solid #cdd1d8;background:#edf0f5;color:#424954;padding:5px 9px;border-radius:8px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}.group-options{display:flex;flex-wrap:wrap;gap:8px}.group-choice{display:flex;align-items:center;gap:8px;border:1px solid #bcc3ce;border-radius:10px;padding:10px;margin:0;min-height:48px;cursor:pointer;max-width:100%;overflow-wrap:anywhere}.group-choice:has(input:checked){background:#eef3ff;border-color:#175cd3;color:#124aa8}.group-choice input{width:20px;min-width:20px;height:20px;min-height:20px;margin:0;accent-color:#175cd3}fieldset{border:0;margin:20px 0 0;padding:0}legend{font-size:14px;font-weight:700;margin-bottom:10px}#member-message{color:#9b2530}#member-message:empty{display:none}
-
-@media(max-width:620px){
-  .event-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-  .card.event-tile{padding:12px;gap:9px;border-radius:14px}
-  .event-tile h2{font-size:15px;line-height:1.55}
-  .event-tile .date{font-size:13px;letter-spacing:0}
-  .event-tile .muted{font-size:12px;overflow-wrap:anywhere}
-  .event-tile .badge{font-size:11px;padding:4px 6px}
-  .event-tile dl{display:block;padding:10px;border-radius:9px}
-  .event-tile dt{font-size:12px}
-  .event-tile dt:not(:first-child){margin-top:9px}
-  .event-tile dd{font-size:15px;margin:2px 0 0}
-  .event-tile a,.event-tile button{min-height:44px;padding:9px 6px;font-size:13px;border-radius:9px;overflow-wrap:anywhere}
-  .event-tile .group-tags{gap:5px;margin:0}
-  .event-tile .group-tag{font-size:11px;padding:3px 6px;max-width:100%}
-}
-
-.view-switch{display:flex;gap:6px;margin-top:14px}
-.view-switch button{min-height:44px;padding:8px 16px;font-size:14px}
-.view-switch [aria-pressed="true"]{background:#17191d;color:white;border-color:#17191d}
-.tile-attendance{border-top:1px solid #cdd1d8;min-width:0}
-.tile-attendance summary{font-size:12px;overflow-wrap:anywhere}
-.tile-attendance summary span{display:block;color:#175cd3;font-weight:500}
-.tile-attendance ul{list-style:none;padding:0;margin:0;display:grid;gap:8px}
-.tile-attendance li{display:flex;justify-content:space-between;gap:6px;font-size:12px;overflow-wrap:anywhere;align-items:start}
-.attendance-status{flex-shrink:0;font-weight:500;color:#4b515b}
-.event-grid.event-list{grid-template-columns:1fr;gap:12px}
-.event-list .event-tile{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,180px);gap:8px 20px;padding:18px;align-content:start}
-.event-list .event-tile>*{grid-column:1;min-width:0}
-.event-list .event-tile h2{font-size:18px}
-.event-list .event-tile dl{grid-column:2;grid-row:1 / span 3;display:block;align-self:start;margin:0}
-.event-list .event-tile dt:not(:first-child){margin-top:8px}
-.event-list .event-tile dd{margin:2px 0 0}
-.event-list .event-tile>a{grid-column:2}
-.event-list .event-tile button{grid-column:auto;margin-top:0;align-self:end}
-.event-list .tile-attendance{grid-column:1 / -1}
-.event-list .tile-attendance summary{font-size:14px}
-.event-list .tile-attendance summary span{display:inline;margin-left:8px}
-.event-list .tile-attendance li{font-size:14px}
-@media(max-width:620px){
-.event-list .card.event-tile{padding:14px;grid-template-columns:minmax(0,1fr) 112px;gap:8px 12px}
-.event-list .event-tile h2{font-size:16px}
-.event-list .event-tile dl{padding:8px}
-.event-list .event-tile .date{font-size:14px}
-}
-
-.tile-attendance li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 6px}
-.tile-attendance .attendance-name{grid-column:1 / -1;min-width:0}
-.attendance-surplus{color:#13613a;font-variant-numeric:tabular-nums;min-width:0}
-.attendance-numbers{display:block;margin-top:4px;line-height:1.6;overflow-wrap:anywhere;font-size:12px}
-.tile-attendance li{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.event-list .tile-attendance li{grid-template-columns:minmax(0,1fr) 4em minmax(4.5em,1fr);align-items:baseline}
-.event-list .tile-attendance .attendance-name{grid-column:auto}
-.event-list .attendance-surplus{text-align:right}
-
-.ticket-entry{padding:12px;border:1px solid #cdd1d8;border-radius:12px;margin:12px 0;background:#f7f8fa}
-.entry-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.entry-label{font-size:14px}.entry-heading button{min-height:44px;padding:6px 12px;font-size:13px}
-.entry-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
-.entry-fields label{margin:8px 0 6px}.entry-fields select{padding-left:8px;padding-right:4px}.entry-url{grid-column:1/-1}.entry-heading span{display:flex;gap:5px}.entry-heading [data-copy-entry]{font-size:12px;min-height:40px;padding:5px 8px}.copy-ticket-details{margin:10px 0;min-height:44px;font-size:13px}
-.batch-add{width:100%;margin-bottom:12px}
-
-.sync-panel{border:1px solid #dfb960;background:#fff9e9;border-radius:12px;padding:14px;margin-bottom:18px;font-size:14px;overflow-wrap:anywhere}
-.sync-panel p{font-size:12px;margin:8px 0 0}.sync-item{padding:10px 0;border-bottom:1px solid #ecd9aa;display:grid;gap:6px}.sync-item b{color:#805800}.sync-item button{font-size:13px;min-height:44px}
-
-/* Quiet, compact everyday interface. */
-:root{font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}
-header{background:#fff;color:#17191d;border-bottom:1px solid #cdd1d8;padding-top:15px;padding-bottom:15px}
-.brand{font-size:17px;font-weight:700;letter-spacing:-.03em;display:inline-flex;align-items:center;gap:10px;color:inherit;text-decoration:none}.brand img{width:48px;height:48px;display:block;flex:none;object-fit:contain;border-radius:10px;background:#fff}.brand span{font-size:17px;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
-#logout{color:#424954;border-color:#bcc3ce;border-radius:5px}
-main{max-width:1080px}
-h1{font-size:24px;letter-spacing:0;font-weight:700}
-button,input,select,textarea{border-radius:5px}
-button{font-weight:600}
-.card{border-radius:6px;box-shadow:none}
-.event-tile{box-shadow:none}
-.event-tile h2{font-weight:650;font-size:18px;line-height:1.65}
-.event-tile .date{color:#20242b;font-weight:600;letter-spacing:.02em}
-.event-tile dl{background:transparent;border-radius:0;border-top:1px solid #d5d9e0;padding:12px 0 0}
-.event-tile dd{font-size:17px;font-weight:600}
-.event-tile a,.detail-page .card>a,.detail-page .card>p>a{background:transparent;border:0;border-radius:0;justify-content:flex-start;text-decoration:underline;text-underline-offset:4px;font-weight:500;padding:8px 0}
-.event-tile button{background:#fff;color:#252830;border-color:#b8c0cc;border-radius:5px}
-.event-tile button:hover{background:#edf3ff}
-.event-tile .edit-event{border-color:transparent;color:#4b515b}
-.event-tile.today{border-top-width:2px}
-.event-tile.deadline{border-top-width:2px}
-.group-tag{border:0;background:#edf0f5;color:#424954;border-radius:3px;padding:3px 7px;font-size:12px}
-.badge{border-radius:3px;font-size:12px;padding:3px 7px}
-.view-switch{gap:0;border-bottom:1px solid #cdd1d8;margin-top:18px}
-.view-switch button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:#4b515b;padding:8px 18px}
-.view-switch [aria-pressed="true"]{background:transparent;color:#174ea6;border-color:#175cd3}
-.event-grid.event-list{gap:0;border:1px solid #cdd1d8;border-radius:6px;overflow:hidden}
-.event-list .card.event-tile{border:0;border-bottom:1px solid #cdd1d8;border-radius:0;padding:20px}
-.event-list .card.event-tile:last-child{border-bottom:0}
-.event-list .event-tile.today{border-left:3px solid #175cd3}
-.event-list .event-tile.deadline{border-left:3px solid #c45b08}
-.event-list .event-tile dl{border-top:0;border-left:1px solid #d5d9e0;padding:0 0 0 16px}
-.tile-attendance summary{font-weight:500}
-.tile-attendance li+li{border-top:1px solid #dde1e7;padding-top:8px}
-.stat{background:transparent;border-left:1px solid #cdd1d8;border-radius:0}
-.stat:first-child{border-left:0}
-.stat b{font-size:25px;font-weight:650}
-.person,.ticket-entry,.group-choice,.sync-panel,.preview-count,.form-message{border-radius:5px}
-dialog{border-radius:8px;box-shadow:0 12px 40px #222b2233}
-dialog::backdrop{background:#20282080}
-.foot{color:#555d69}
-@media(max-width:620px){
-  header{padding:12px 14px;gap:8px}
-  .brand{font-size:16px}
-  main{padding:18px 12px max(24px,env(safe-area-inset-bottom))}
-  h1{font-size:22px}
-  .card.event-tile{border-radius:5px;padding:11px;gap:8px}
-  .event-tile h2{font-size:15px}
-  .event-tile dl{padding:9px 0 0;border-radius:0}
-  .event-tile a{padding:7px 0;font-size:12px}
-  .event-tile button{border-radius:4px}
-  .event-list .card.event-tile{padding:14px 12px}
-  .event-list .event-tile dl{padding:0 0 0 10px}
-  dialog{border-radius:10px 10px 0 0}
-}
-
-/* Event scanning and action hierarchy */
-.home-filters{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;margin-top:8px}
-.home-filters label{font-size:13px;margin:12px 0 6px}
-.home-filters .search{margin:0}
-.results-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #cdd1d8;margin-top:14px}
-.results-info{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:#4b515b}
-#clear-filters{font-size:12px;padding:6px 8px;border:0;background:transparent;text-decoration:underline;min-height:44px;color:#175cd3}
-.results-toolbar .view-switch{border:0;margin:0;flex-shrink:0}
-.event-grid{margin-top:14px;align-items:start}
-.event-overview{min-width:0}
-.event-dateline{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px}
-.event-dateline .date{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
-.event-tile .event-overview h2{margin:0 0 6px}
-.event-venue{line-height:1.5}
-.event-tile .my-attendance{font-size:12px;color:#4b515b;margin-top:8px}
-.my-attendance strong{font-weight:600;color:#252830;margin-left:5px}
-.event-tile .event-facts{min-width:0}
-.event-tile .event-facts dl{margin:0}
-.event-tile .event-facts>a{font-size:13px;min-height:44px}
-.event-tile .event-facts>p{font-size:12px;margin-top:8px}
-.event-tile .event-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:auto;min-width:0}
-.event-actions button{min-width:0;width:100%;margin:0;min-height:44px;padding:9px 8px;font-size:14px}
-.event-tile .register-ticket{background:#175cd3;color:#fff;border-color:#175cd3}
-.event-tile .register-ticket:hover{background:#124aa8}
-.event-tile .edit-event{width:auto;justify-self:end;align-self:flex-end;padding:4px 8px;min-height:44px;font-size:12px;margin-top:-8px}
-.tile-attendance summary{font-size:13px;min-height:48px}
-.event-list .card.event-tile{grid-template-columns:minmax(0,1fr) 185px;gap:10px 20px;align-items:start}
-.event-list .event-overview{grid-column:1;grid-row:1}
-.event-list .event-facts{grid-column:2;grid-row:1}
-.event-list .event-facts dl{border-left:1px solid #d5d9e0;padding-left:16px}
-.event-list .event-facts>a,.event-list .event-facts>p{padding-left:16px}
-.event-list .event-actions{grid-column:1 / -1;justify-self:start;width:min(100%,360px)}
-.event-list .tile-attendance{grid-column:1 / -1}
-.event-list .edit-event{grid-column:1 / -1}
-@media(max-width:620px){
-  .top{gap:10px}
-  .top .actions{width:auto}
-  .top .actions button{min-height:44px;font-size:13px;padding:9px 10px}
-  .top h1{font-size:21px}
-  .home-filters{gap:10px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  .home-filters input,.home-filters select{padding:10px 8px;min-height:46px}
-  .results-toolbar .view-switch button{padding:8px 11px;font-size:13px}
-  .results-info{gap:0;font-size:12px}
-  .event-list .card.event-tile{grid-template-columns:minmax(0,1fr) 108px;gap:10px 12px}
-  .event-list .event-facts dl{padding-left:10px}
-  .event-list .event-facts>a,.event-list .event-facts>p{padding-left:10px}
-  .event-tile .event-dateline .date{font-size:16px}
-  .event-tile .event-dateline .badge{font-size:11px}
-  .event-tile .event-actions{grid-template-columns:1fr}
-  .event-list .event-actions{grid-template-columns:1fr 1fr;width:100%}
-  .event-tile .event-actions button{font-size:13px}
-  .event-tile .event-overview h2{font-size:15px}
-  .event-tile .group-tags{margin-top:7px}
-  .event-tile .my-attendance{font-size:12px}
-  .event-tile .tile-attendance summary{font-size:12px}
-}
-@media(max-width:360px){.top .actions{width:100%}.home-filters{grid-template-columns:1fr;gap:0}}
-.event-tile .event-facts .edit-event{display:block;margin:4px 0 0;padding:5px 0;font-size:12px;min-height:44px;text-align:left;width:auto}.event-list .event-facts .edit-event{margin-left:16px}@media(max-width:620px){.event-list .event-facts .edit-event{margin-left:10px}}
-
-/* Each member's own tickets and surplus remain separately labelled. */
-.attendance-personal{color:#174ea6;min-width:0;font-variant-numeric:tabular-nums}
-.tile-attendance .attendance-name{grid-column:1;font-weight:600}
-.tile-attendance .attendance-status{grid-column:2;text-align:right}
-.tile-attendance .attendance-personal,.tile-attendance .attendance-surplus{grid-column:1 / -1;text-align:left}
-.event-list .tile-attendance li{grid-template-columns:minmax(0,1fr) 4em minmax(0,1fr) minmax(0,1fr);gap:6px 12px;align-items:start}
-.event-list .tile-attendance .attendance-name{grid-column:1}
-.event-list .tile-attendance .attendance-personal{grid-column:3}
-.event-list .tile-attendance .attendance-surplus{grid-column:4}
-@media(max-width:620px){
-.event-list .tile-attendance .attendance-name{grid-column:1 / 3}
-.event-list .tile-attendance .attendance-status{grid-column:3 / 5}
-.event-list .tile-attendance .attendance-personal{grid-column:1 / 3}
-.event-list .tile-attendance .attendance-surplus{grid-column:3 / 5}
-}
-.event-tile .event-actions{grid-template-columns:1fr}.my-attendance label{display:block;margin:10px 0 5px;font-size:12px}.my-attendance select{width:100%;max-width:220px;margin:0;min-height:44px}.manager-add{width:100%;margin:8px 0 18px}.manager-tickets .ticket{display:grid;grid-template-columns:minmax(45px,1fr) minmax(80px,2fr) auto;gap:10px}.manager-tickets .num{overflow-wrap:anywhere;min-width:0;font-size:20px}.manager-tickets .ticket-body{min-width:0;overflow-wrap:anywhere}.manager-sync{padding:12px;background:#fff0df;color:#8c3c00}.event-memo{margin-top:10px;font-size:13px}.event-memo p{overflow-wrap:anywhere}.modal-actions:has(#submit-save[hidden]){grid-template-columns:1fr}
-/* Save feedback is outside document flow, so its appearance never shifts cards. */
-.sync-panel{position:fixed;right:16px;bottom:max(76px,calc(env(safe-area-inset-bottom) + 64px));z-index:15;width:min(340px,calc(100vw - 32px));max-height:45dvh;overflow:auto;margin:0;padding:0 14px;box-shadow:0 3px 14px #17191d18}
-.sync-panel>summary{padding:10px 0;min-height:44px}.sync-panel>p{margin-bottom:12px}
-html{scrollbar-gutter:stable}
-.my-ticket-summary{text-align:left;width:100%;font-size:13px;font-weight:400;overflow-wrap:anywhere;background:#f4f7fc;border-color:#d9e2f2;padding:10px}.my-ticket-summary span{display:block;margin-top:4px}.event-list .my-ticket-summary{grid-column:1 / -1}.copy-surplus{font-size:13px;min-height:44px;background:white;color:#4b515b}.event-list .copy-surplus{grid-column:1 / -1;justify-self:start}.my-filters{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}.my-filters button{font-size:13px;min-height:44px;padding:8px 12px}.my-filters [aria-pressed=true]{background:#175cd3;color:white;border-color:#175cd3}.status-label{margin:0 0 4px;font-size:12px}.manager-tickets select{padding:8px;min-height:44px}.manager-tickets .ticket{grid-template-columns:minmax(40px,.7fr) minmax(100px,1.5fr) auto}
-.my-surplus-list{margin-top:14px;width:100%;text-align:left;font-weight:700;color:#175cd3}.surplus-event{border-top:1px solid #cdd1d8;padding:16px 0}.surplus-event h3{margin:6px 0;font-size:17px;overflow-wrap:anywhere}.surplus-event p{margin:6px 0 12px}.surplus-numbers{font-weight:700;overflow-wrap:anywhere}.surplus-numbers span{font-weight:400;font-size:13px}.duplicate-warning:empty{display:none}.duplicate-warning{background:#fff4e5;border:1px solid #dcb67a;padding:12px;margin:12px 0;font-size:14px;overflow-wrap:anywhere}.duplicate-warning ul{padding-left:20px}.duplicate-ack{display:flex;align-items:flex-start;gap:10px;font-weight:400;cursor:pointer;min-height:44px}.duplicate-ack input{width:20px;height:20px;min-height:20px;flex:0 0 20px;margin-top:3px}
-
-/* Keep account actions together, including on narrow phones. */
-#account{max-width:100%;flex-wrap:nowrap}
-#account #logout,#account #notification-settings{flex:none;white-space:nowrap;min-height:44px;padding:8px 10px;font-size:13px;line-height:1.4;border-radius:5px}
-#account #notification-settings{background:#fff;color:#2b56c8;border-color:#bcc3ce}
-#account #notification-settings:hover{background:#eef3ff}
-@media(max-width:620px){
-  header .brand{flex-basis:100%}
-  header #account{width:100%;gap:8px}
-  #account .account-name{margin-right:auto;min-width:0;max-width:calc(100% - 190px)}
-}
-.event-grid .event-tile a.venue-map{display:inline-flex;align-items:center;justify-content:flex-start;gap:5px;min-height:36px;max-width:100%;padding:2px 0;border:0;border-radius:3px;background:transparent;color:#2b56c8;font-size:inherit;font-weight:400;line-height:1.5;text-align:left;text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
-.event-grid .event-tile a.venue-map:hover{color:#173c9d;background:#eef3ff}
-
-/* Compact mobile controls: size buttons to their labels, never split labels. */
-#reload,#new-live,.my-filters button,.view-switch button,.event-actions button,.edit-event,.copy-surplus{white-space:nowrap}
-.top .actions{flex-shrink:0;flex-wrap:nowrap}
-.top .actions #reload,.top .actions #new-live{flex:0 0 auto}
-@media(max-width:620px){
-  header{padding-top:8px;padding-bottom:8px;gap:4px}
-  main{padding-top:12px}
-  #app>.top{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px}
-  #app>.top>div{min-width:0}
-  #app>.top h1{font-size:18px;line-height:1.3;margin:0!important;white-space:nowrap}
-  #app>.top .actions{width:auto;gap:6px}
-  #app>.top .actions button{font-size:12px;line-height:1.3;min-height:44px;padding:8px}
-  .home-filters{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin-top:4px}
-  .home-filters label{font-size:12px;margin:6px 0 4px}
-  .home-filters input,.home-filters select{min-height:44px;padding:8px 6px}
-  .my-surplus-list{font-size:13px;line-height:1.4;min-height:44px;margin-top:8px;padding:8px 10px}
-  .my-filters{flex-wrap:nowrap;gap:4px;margin-top:8px;overflow-x:auto}
-  .my-filters button{flex:0 0 auto;font-size:12px;min-height:44px;padding:6px}
-  .results-toolbar{margin-top:6px;gap:6px}
-  .results-toolbar .view-switch button{min-height:44px;padding:6px 9px;font-size:12px}
-  .event-grid{margin-top:10px;gap:10px}
-  .event-list .card.event-tile{padding:12px 10px;gap:8px 10px}
-  .event-tile .event-dateline{gap:6px;margin-bottom:4px}
-  .event-tile .event-overview h2{margin-bottom:4px}
-  .event-tile .event-facts dd{font-size:15px;line-height:1.4}
-  .event-list .event-facts dd{font-size:14px}
-  .event-tile .event-actions button{font-size:12px;padding:8px 6px}
-}
-@media(max-width:360px){
-  #app>.top h1{font-size:16px}
-  #app>.top .actions{gap:4px}
-  #app>.top .actions button{padding-left:6px;padding-right:6px}
-}
-
-/* Visual tidy-up: clarify primary and secondary event actions. */
-.event-tile .my-ticket-summary{transition:background-color .15s,border-color .15s}
-.event-tile .my-ticket-summary:hover{background:#edf3ff;border-color:#a9bee9}
-.event-tile .my-ticket-summary:focus-visible{outline:3px solid #175cd3;outline-offset:2px}
-.event-tile .tile-attendance{border-top:1px solid #e1e4e9}
-.event-tile .tile-attendance summary{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.event-tile .tile-attendance summary span{flex:none;padding:3px 7px;background:#f1f3f6;border-radius:3px;font-size:12px}
-.event-list .tile-attendance{grid-column:1 / -1}
-.event-tile .copy-surplus,
-.event-list .event-tile .copy-surplus{width:auto;justify-self:end;align-self:center;min-height:36px;margin:0;padding:5px 8px;border:0;background:transparent;color:#4b515b;font-size:12px;font-weight:500;text-decoration:underline;text-underline-offset:3px}
-.event-tile .copy-surplus:hover{background:#f1f3f6;color:#174ea6}
-.event-tile .event-memo{border-top:1px solid #e1e4e9;padding-top:8px}
-.event-tile .event-memo .muted{font-size:11px}
-.event-tile .event-memo .note{font-size:13px;line-height:1.5}
-@media(max-width:620px){
- .event-list .tile-attendance{grid-column:1 / -1}
- .event-list .card.event-tile{gap:8px 10px}
- .event-tile .copy-surplus,.event-list .event-tile .copy-surplus{min-height:36px;padding:4px 6px}
- .event-tile .tile-attendance summary{min-height:44px}
-}
-/* One ticket entry point and a compact utility row. */
-.event-tile .my-ticket-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;min-height:44px;margin:0;background:#f5f8ff;border-color:#c6d3ef;font-size:13px;font-weight:400}
-.my-ticket-summary .ticket-summary-values{display:flex;flex-wrap:wrap;gap:4px 16px;min-width:0;margin:0}
-.my-ticket-summary .ticket-summary-values>span{margin:0;min-width:0;overflow-wrap:anywhere}
-.my-ticket-summary .ticket-summary-action{display:flex;align-items:center;gap:8px;flex:none;white-space:nowrap;margin:0;color:#174ea6;font-size:12px;font-weight:600}
-.my-ticket-summary .ticket-summary-action>span{display:inline;margin:0;font-size:20px}
-.results-info{gap:6px}
-.results-toolbar .my-surplus-list{width:auto;min-height:44px;margin:0;padding:6px 8px;font-size:12px;font-weight:500;white-space:nowrap;border-color:transparent;background:transparent}
-.results-toolbar .my-surplus-list:hover{background:#eef3ff}
-.event-tile .event-facts .undated-surplus{margin-top:8px}
-@media(max-width:620px){
- .results-toolbar{gap:4px}
- .results-info{gap:2px}
- .results-toolbar .view-switch button{padding:6px 7px}
- .results-toolbar .my-surplus-list{padding:6px}
- .event-tile .my-ticket-summary{padding:8px;gap:8px}
- .event-grid:not(.event-list) .my-ticket-summary{flex-direction:column;align-items:stretch;gap:4px}
- .event-grid:not(.event-list) .ticket-summary-action{align-self:flex-end}
-}
-
-/* Compact the personal attendance control without shrinking its touch target. */
-.event-tile .my-attendance{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-top:5px}
-.event-tile .my-attendance label{display:inline-block;margin:0;font-size:12px;line-height:1.4}
-.event-tile .my-attendance select{width:min(100%,150px);max-width:150px;min-width:112px;min-height:44px;height:44px;margin:0;padding:6px 26px 6px 9px;font-size:13px;line-height:1.3}
-@media(max-width:620px){
-  .event-tile .my-attendance{gap:4px 6px;margin-top:4px}
-  .event-tile .my-attendance label{font-size:11px}
-  .event-tile .my-attendance select{width:min(100%,140px);max-width:140px;min-width:108px;padding:6px 22px 6px 7px;font-size:12px}
-}
-
-/* Keep attendance roster, headcount and surplus copy on one line in list view. */
-.event-footer{grid-column:1 / -1;display:flex;align-items:center;gap:8px;min-width:0;border-top:1px solid #e1e4e9}
-.event-footer .tile-attendance{flex:1 1 auto;min-width:0;border:0}
-.event-footer .tile-attendance summary{min-height:44px;padding:4px 0}
-.event-footer .tile-attendance summary span{display:inline-flex;align-items:center;min-height:24px;margin:0;padding:2px 6px;white-space:nowrap}
-.event-footer .copy-surplus,.event-list .event-tile .event-footer .copy-surplus{flex:0 0 auto;justify-self:auto;min-height:36px;white-space:nowrap;padding:4px 6px}
-@media(max-width:620px){
- .event-list .event-footer{gap:4px}
- .event-list .event-footer .tile-attendance summary{gap:4px;font-size:12px}
- .event-list .event-footer .tile-attendance summary span{font-size:11px;padding:2px 5px}
- .event-list .event-footer .copy-surplus{font-size:11px}
- .event-grid:not(.event-list) .event-footer{flex-wrap:wrap;gap:2px 6px}
- .event-grid:not(.event-list) .event-footer .tile-attendance{flex-basis:100%}
- .event-grid:not(.event-list) .event-footer .copy-surplus{margin-left:auto}
-}
-
-.event-list .event-tile .event-footer{grid-column:1 / -1}
-
-/* Month calendar view */
-.calendar-view{margin-top:12px}.calendar-toolbar{display:flex;align-items:center;justify-content:center;gap:12px;margin:14px 0}.calendar-toolbar h2{min-width:150px;text-align:center;font-size:18px}.calendar-toolbar button{min-height:40px;padding:6px 13px;font-size:20px}.calendar-toolbar .calendar-today{font-size:13px;margin-left:4px}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid #d5d9e0;border-left:1px solid #d5d9e0;background:white}.calendar-weekday{text-align:center;padding:8px 4px;font-size:13px;font-weight:750;color:#4b515b;border-right:1px solid #d5d9e0;border-bottom:1px solid #d5d9e0;background:#f4f5f7}.calendar-day{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:5px;width:100%;min-width:0;min-height:112px;padding:8px;border:0;border-radius:0;border-right:1px solid #d5d9e0;border-bottom:1px solid #d5d9e0;background:white;text-align:left;overflow:hidden}.calendar-day:hover{background:#f5f8ff}.calendar-day.outside{background:#fafafa;color:#a1a6af}.calendar-day.today .calendar-day-number{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#175cd3;color:white}.calendar-day.selected{box-shadow:inset 0 0 0 2px #175cd3;background:#f5f8ff}.calendar-day-number{font-size:13px;font-weight:750;line-height:26px}.calendar-chips{display:flex;flex-direction:column;gap:3px;min-width:0}.calendar-chip{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;padding:2px 4px;background:#e8efff;color:#24478e;font-size:11px;line-height:1.45}.calendar-chip b{font-size:10px}.calendar-chip.deadline{background:#fff0df;color:#8c3c00}.calendar-markers{display:none}.calendar-agenda{margin-top:20px}.calendar-agenda>h2{font-size:16px;margin:0 0 10px}.calendar-day-events{margin-top:0}.calendar-empty{margin:0;padding:18px;background:white;border:1px solid #d5d9e0;border-radius:12px;color:#68707c;font-size:14px}
-@media(max-width:620px){.calendar-view{margin-top:8px}.calendar-toolbar{gap:6px;margin:8px 0}.calendar-toolbar h2{min-width:0;flex:1;font-size:16px}.calendar-toolbar button{min-height:38px;padding:4px 10px}.calendar-grid{margin:0 -2px}.calendar-weekday{padding:5px 1px;font-size:11px}.calendar-day{min-height:58px;padding:5px 2px;align-items:center;gap:2px}.calendar-day-number{font-size:12px;line-height:22px}.calendar-day.today .calendar-day-number{width:22px;height:22px}.calendar-chips{display:none}.calendar-markers{display:flex;align-items:center;justify-content:center;gap:2px;height:8px}.calendar-marker{display:inline-block;width:5px;height:5px;border-radius:50%;background:#2b56c8}.calendar-marker.deadline{background:#c45b08}.calendar-markers small{font-size:9px;color:#4b515b}.calendar-agenda{margin-top:14px}.calendar-agenda>h2{font-size:15px}}
-.startup-screen{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#fff;opacity:1;transition:opacity .2s ease}.startup-screen.closing{opacity:0;pointer-events:none}.startup-content{display:flex;flex-direction:column;align-items:center;gap:10px;color:#175cd3}.startup-ticket{width:48px;height:48px;animation:ticket-arrive .55s cubic-bezier(.2,.8,.2,1) both}.startup-title{font-size:18px;letter-spacing:.02em;color:#20242b;animation:startup-fade .45s .08s both}.startup-message{font-size:13px;color:#68707c;animation:startup-fade .45s .14s both}.startup-progress{width:84px;height:2px;overflow:hidden;background:#e8edf5;border-radius:2px;margin-top:4px}.startup-progress i{display:block;width:40%;height:100%;background:#175cd3;border-radius:2px;animation:startup-progress 1s ease-in-out infinite alternate}@keyframes ticket-arrive{from{opacity:0;transform:translateY(8px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes startup-fade{from{opacity:0}to{opacity:1}}@keyframes startup-progress{from{transform:translateX(-30%)}to{transform:translateX(160%)}}@media(prefers-reduced-motion:reduce){.startup-ticket,.startup-title,.startup-message,.startup-progress i{animation:none}.startup-screen{transition:none}}
-
-.brand{gap:10px}.brand img{width:48px;height:48px}
-.startup-screen{background:#fffdf9}
-.startup-content{gap:11px}
-.startup-ticket{width:min(240px,76vw);height:150px;display:grid;place-items:center;overflow:visible}
-.launch-ticket{width:100%;height:100%;overflow:visible;animation:ticket-launch 1.65s cubic-bezier(.18,.82,.28,1) both}
-.ticket-stub{transform-box:fill-box;transform-origin:left center;animation:stub-tear .82s .78s cubic-bezier(.2,.72,.25,1) both}
-.tear-seam{opacity:0;animation:seam-flash .55s .72s ease-out both}
-.startup-title{font-size:23px;font-weight:850;letter-spacing:-.025em;color:#10284b;animation:startup-fade .42s 1.15s both}
-.startup-message{font-size:13px;color:#68707c;animation:startup-fade .4s 1.32s both}
-.startup-progress{width:116px;height:3px;background:#e9edf3}
-.startup-progress i{background:#2788f5;animation:startup-progress 1s ease-in-out infinite alternate}
-@keyframes ticket-launch{0%{opacity:0;transform:translateY(58px) scale(.7) rotate(-14deg)}42%{opacity:1;transform:translateY(-8px) scale(1.04) rotate(4deg)}58%{transform:translateY(2px) scale(.99) rotate(-1deg)}72%,100%{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
-@keyframes stub-tear{0%,18%{opacity:1;transform:translate(0,0) rotate(0)}30%{transform:translate(-3px,0) rotate(-3deg)}42%{transform:translate(4px,-1px) rotate(4deg)}56%{transform:translate(-2px,1px) rotate(-2deg)}100%{opacity:.15;transform:translate(48px,23px) rotate(21deg)}}
-@keyframes seam-flash{0%,100%{opacity:0}30%,65%{opacity:1}}
-@media(max-width:520px){.brand img{width:42px;height:42px}.brand span{font-size:15px}header{gap:8px}}
-@media(prefers-reduced-motion:reduce){.launch-ticket,.ticket-stub,.tear-seam,.startup-title,.startup-message,.startup-progress i{animation:none!important}.startup-screen{transition:none}}
-
-.memo-quick{margin-top:5px}
-.memo-quick summary{color:#175cd3;font-size:12px;font-weight:700;cursor:pointer;min-height:36px;padding:7px 0}
-.memo-quick textarea{display:block;width:100%;min-height:64px;margin:4px 0 7px;padding:9px;font-size:13px}
-.memo-quick .memo-save{min-height:38px;padding:7px 12px;font-size:12px}
- .ticket-copy-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.manager-tickets .ticket-copy-actions button{width:auto;min-height:40px;padding:6px 8px;font-size:12px}
-
-/* Clear application state, archive actions and compact mobile filtering. */
-.status-overview{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}
-.status-overview button{width:auto;min-height:44px;margin:0;padding:8px 12px;font-size:13px}
-.status-overview .today-alert{display:inline-flex;align-items:center;gap:6px;background:#fff3e7;border-color:#e9b374;color:#753b00}
-.today-alert strong{font-size:18px;font-variant-numeric:tabular-nums}
-.status-overview .archive-toggle,.status-overview .filter-toggle{background:#fff;color:#333}
-.my-application{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
-.my-application label{margin:0;font-size:12px}
-.my-application select{width:auto;min-width:132px;min-height:44px;height:44px;padding:6px 28px 6px 9px;font-size:13px}
-.application-auto{font-size:12px;color:#555d69}
-.application-pill{display:inline-flex;align-items:center;min-height:26px;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:650}
-.application-unresolved{background:#ffeded;color:#9b2530}
-.application-unsubmitted{background:#fff3e7;color:#804000}
-.application-complete{background:#e8f3ed;color:#13613a}
-.application-not-needed{background:#edf0f5;color:#4b515b}
-.event-tile.application-needed{background:#fffaf5}
-.event-tile.application-needed .event-overview{border-left:3px solid #c45b08;padding-left:10px}
-.event-actions{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin-top:8px}
-.event-actions button{width:auto;min-height:40px;margin:0;padding:6px 10px;font-size:12px}
-.event-actions .archive-event{color:#8b3942;border-color:#d8b6bb;background:#fff}
-.event-actions .restore-event{color:#13613a;border-color:#a8cab7}
-.archived-badge{background:#eef0f4;color:#555d69}
-.event-tile.archived-event{background:#f8f9fb}
-.filter-toggle{display:none}
-@media(max-width:620px){
-  .status-overview{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin:8px 0}
-  .status-overview .today-alert{grid-column:1/-1;justify-content:flex-start}
-  .status-overview .filter-toggle{display:inline-flex;justify-content:center}
-  #app:not(.filters-expanded) .home-filters,#app:not(.filters-expanded) .my-filters{display:none}
-  .home-filters{grid-template-columns:1fr 1fr}
-  .home-filters>div:first-child{grid-column:1/-1}
-  .home-filters label{margin:6px 0 4px}
-  .event-actions{justify-content:flex-start;margin-top:6px}
-  .event-actions button{min-height:40px;padding:5px 8px}
-  .my-application{gap:5px}
-  .my-application select{min-width:120px}
-  .application-pill{font-size:10px;padding:3px 6px}
-}
-
-
-.loading-state{max-width:520px;margin:36px auto;text-align:center;padding:30px}
-.loading-spinner{display:block;width:28px;height:28px;margin:0 auto 14px;border:3px solid #d5d9e0;border-top-color:#175cd3;border-radius:50%;animation:tm-spin .8s linear infinite}
-.loading-state h2{font-size:17px}
-.load-error{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:12px 14px;border:1px solid #e0afb4;background:#fff2f3;color:#8f2630;font-size:13px}
-.load-error button{width:auto;min-height:40px;margin:0;padding:6px 10px}
-@keyframes tm-spin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.loading-spinner{animation:none}}
-
-
-.ticket-status-control{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.ticket-status-control select{flex:1 1 130px}
-.ticket-status-control .cycle-status{width:auto;min-height:40px;margin:0;padding:6px 9px;font-size:12px;white-space:nowrap}
-@media(max-width:620px){.ticket-status-control .cycle-status{min-height:44px}}
-
-</style></head><body><div id="startup-screen" class="startup-screen" role="status" aria-live="polite">
+<link rel="stylesheet" href="./styles.css?v=20261109"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-live="polite">
   <div class="startup-content">
     <div class="startup-ticket" aria-hidden="true">
       <svg class="launch-ticket" viewBox="0 0 240 150">
@@ -458,7 +50,6 @@ function readEventSuggestions(){try{const value=JSON.parse(localStorage.getItem(
 function liveFieldOptions(fieldName){const saved=readEventSuggestions(),recent=fieldName==='title'?saved.titles:saved.venues,shared=(data?.lives||[]).map(l=>l[fieldName]),seen=new Set(),result=[];for(const raw of [...recent,...shared]){const value=String(raw||'').trim(),key=value.normalize('NFKC').toLocaleLowerCase('ja');if(!value||seen.has(key))continue;seen.add(key);result.push(value)}return result}
 function rememberEventInput(title,venue){const saved=readEventSuggestions();for(const [key,raw] of [['titles',title],['venues',venue]]){const value=String(raw||'').trim();if(!value)continue;const normalized=value.normalize('NFKC').toLocaleLowerCase('ja');saved[key]=[value,...saved[key].filter(x=>x.normalize('NFKC').toLocaleLowerCase('ja')!==normalized)].slice(0,40)}try{localStorage.setItem(eventSuggestionKey,JSON.stringify(saved))}catch(e){}}
 function suggestionList(id,values){return`<datalist id="${esc(id)}">${values.map(value=>`<option value="${esc(value)}"></option>`).join('')}</datalist>`}
-const liveRequirements=l=>`<span style="display:block;margin-top:8px;line-height:1.7" class="muted">抽選締切：${esc(l.lotteryDeadline||'未設定')}<br>投げ数：${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</span>`;
 const groupTags=l=>(l.groups||[]).length?`<div class="group-tags" aria-label="出演グループ">${l.groups.map(g=>`<span class="group-tag">${esc(g)}</span>`).join('')}</div>`:'';
 const badge=s=>`<span class="badge ${s==='余り'?'available':s==='取引中'?'pending':s==='捌けた'?'done':''}">${esc(s)}</span>`;
 const startupStartedAt=performance.now();let startupCloseTimer=0;
@@ -466,7 +57,7 @@ function finishStartup(){
   const screen=$('startup-screen');
   if(!screen||screen.classList.contains('closing')||startupCloseTimer)return;
   const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const minimum=reduced?450:1900;
+  const minimum=reduced?0:300; // only long enough to avoid a flash
   const wait=Math.max(0,minimum-(performance.now()-startupStartedAt));
   startupCloseTimer=setTimeout(()=>{
     if(!screen.isConnected)return;
@@ -494,7 +85,7 @@ async function refresh(){
   }catch(e){
     if(version!==refreshVersion||memberId!==requestedMember)return;
     if(!data){
-      $('app').innerHTML='<div class="card login"><h1>読み込めませんでした</h1><p class="muted">選んだ名前はそのままです。もう一度お試しください。</p><button id="reload" class="primary">再読込</button> <button id="change-member">名前を選び直す</button></div>';
+      $('app').innerHTML='<div class="card login"><h1>読み込めませんでした</h1><p class="muted">通信状態を確認して、もう一度お試しください。</p><div id="member-options"><button id="reload" class="primary">再読込</button><button id="change-member">ログイン画面に戻る</button></div></div>';
       $('reload').onclick=refresh;$('change-member').onclick=chooseMemberScreen;
     }
     if(data){document.getElementById('load-error')?.remove();const host=$('sync-host');if(host){host.insertAdjacentHTML('afterend','<div id="load-error" class="load-error" role="alert"><span>'+esc(e.message||'読み込みに失敗しました')+'</span><button type="button" id="retry-load">再読み込み</button></div>');$('retry-load').onclick=()=>{document.getElementById('load-error')?.remove();refresh()}}notice(e.message)}else notice(e.message);finishStartup();
@@ -596,18 +187,18 @@ async function save(action,p){
 }
 
 function rememberMember(id){if(id!==memberId){++refreshVersion;loading=false;try{sessionStorage.removeItem('ticket-snapshot')}catch(e){}}memberId=id;try{if(id)localStorage.setItem('live-pocket-member',id);else localStorage.removeItem('live-pocket-member')}catch(e){}}
-function memberMessage(message){const el=$('member-message');if(el)el.textContent=message;else notice(message)}
+function memberMessage(message,isError=false){const el=$('member-message');if(el){el.textContent=message;el.classList.toggle('is-error',isError)}else notice(message)}
 async function chooseMemberScreen(){
   const screenVersion=++refreshVersion;loading=false;cachedView=false;
   data=null;selected='';searchQuery='';groupFilter='';myFilter='すべて';memberId='';$('account').textContent='';
-  $('app').innerHTML='<div class="card login"><span class="date">Ticket Management</span><h1 style="margin-top:12px">Googleアカウントでログイン</h1><p class="muted">登録されたアカウントだけがメンバー情報を編集できます。</p><p id="member-message" class="muted" role="status" aria-live="polite">ログインの準備中…</p><div id="member-options"></div></div>';
+  $('app').innerHTML='<div class="card login"><img class="login-mark" src="./icons/ticket-management.png?v=3" alt=""><h1>ログイン</h1><p class="muted">メンバー登録済みのGoogleアカウントでログインしてください。</p><p id="member-message" role="status" aria-live="polite">ログインの準備中…</p><div id="member-options"></div></div>';
   const showError=(message,showSignIn=true)=>{
     const host=$('member-options');if(!host)return;
-    host.innerHTML=(showSignIn?'<button id="google-sign-in" class="primary" style="width:100%;margin-top:12px">Googleでログイン</button>':'')+'<button id="retry-members" style="width:100%;margin-top:12px">再読込</button>';
+    host.innerHTML=(showSignIn?'<button id="google-sign-in" class="primary">Googleでログイン</button>':'')+'<button id="retry-members">再読込</button>';
     $('retry-members').onclick=chooseMemberScreen;
     $('google-sign-in')?.addEventListener('click',async()=>{
       const button=$('google-sign-in');button.disabled=true;memberMessage('Googleに接続中…');
-      try{await auth.signIn();await finishLogin()}catch(e){memberMessage(e.message||'ログインできませんでした');button.disabled=false}
+      try{await auth.signIn();await finishLogin()}catch(e){memberMessage(e.message||'ログインできませんでした。もう一度お試しください',true);button.disabled=false}
     });
   };
   const finishLogin=async()=>{
@@ -624,7 +215,7 @@ async function chooseMemberScreen(){
         await refresh();
       }
       setTimeout(()=>import('./notifications.js').then(m=>m.resume()).catch(()=>{}),1000);
-    }catch(e){if(screenVersion!==refreshVersion)return;memberMessage(e.message);showError(e.message,false);const signOut=document.createElement('button');signOut.textContent='別のGoogleアカウントでログイン';signOut.style.cssText='width:100%;margin-top:12px';signOut.onclick=async()=>{await auth.signOut();chooseMemberScreen()};$('member-options').append(signOut)}
+    }catch(e){if(screenVersion!==refreshVersion)return;memberMessage(e.message,true);showError(e.message,false);const signOut=document.createElement('button');signOut.textContent='別のGoogleアカウントでログイン';signOut.onclick=async()=>{await auth.signOut();chooseMemberScreen()};$('member-options').append(signOut)}
   };
   try{
     const config=await rpc('getAuthConfig');
@@ -632,9 +223,9 @@ async function chooseMemberScreen(){
     if(!config?.ready)throw new Error('Firebase Authenticationを設定してください。管理者はREADMEのログイン設定を確認してください');
     const module=await import('./auth.js');auth=await module.initialize(config.firebase);
     if(auth.currentUser())await finishLogin();
-    else{memberMessage('登録済みのGoogleアカウントでログインしてください');showError('')}
+    else{memberMessage('');showError('')}
     finishStartup();
-  }catch(e){if(screenVersion!==refreshVersion)return;memberMessage(e.message);showError(e.message,false);finishStartup()}
+  }catch(e){if(screenVersion!==refreshVersion)return;memberMessage(e.message,true);showError(e.message,false);finishStartup()}
 }
 
 function cacheSnapshot(){try{sessionStorage.setItem('ticket-snapshot',JSON.stringify({endpoint:window.LIVE_POCKET_CONFIG.gasUrl,memberId,data}))}catch(e){}}
@@ -644,7 +235,7 @@ function handleHistory(){if($('modal').open){closeModal()}history.replaceState({
 function attendanceDropdown(l){
   const entries=new Map((data.attendance||[]).filter(a=>a.liveId===l.id).map(a=>[a.memberId,a.status]));
   const attending=data.members.filter(m=>entries.get(m.id)==='参戦').length;
-  const surplus=new Map(),personal=new Map();
+  const surplus=new Map(),personal=new Map();if(!data.members)return '';
   for(const ticket of data.tickets||[]){
     if(ticket.liveId!==l.id)continue;
     const target=ticket.status==='余り'?surplus:ticket.status==='自分用'?personal:null;
@@ -656,7 +247,7 @@ function attendanceDropdown(l){
     const values=map.get(id)||[];
     return values.length?`<span class="attendance-numbers" aria-label="${label}の整理番号">${[...values].sort((a,b)=>a.localeCompare(b,'ja',{numeric:true})).map(n=>esc(n||'番号未入力')).join('、')}</span>`:'';
   };
-  return `<details class="tile-attendance"><summary>みんなの参戦予定 <span>${attending}人参戦</span></summary><ul>${data.members.map(m=>`<li><span class="attendance-name">${esc(m.name)}</span><strong class="attendance-status">${esc(entries.get(m.id)||'未回答')}</strong><span class="attendance-personal">自分用${(personal.get(m.id)||[]).length}枚${numbers(personal,m.id,'自分用')}</span><span class="attendance-surplus">余り${(surplus.get(m.id)||[]).length}枚${numbers(surplus,m.id,'余り')}</span></li>`).join('')||'<li>メンバー未登録</li>'}</ul></details>`;
+  return `<details class="tile-attendance"><summary>みんなの予定 <span>${attending}人参戦</span></summary><ul>${data.members.map(m=>`<li><span class="attendance-name">${esc(m.name)}</span><strong class="attendance-status">${esc(entries.get(m.id)||'未回答')}</strong><span class="attendance-personal">自分用${(personal.get(m.id)||[]).length}枚${numbers(personal,m.id,'自分用')}</span><span class="attendance-surplus">余り${(surplus.get(m.id)||[]).length}枚${numbers(surplus,m.id,'余り')}</span></li>`).join('')||'<li>メンバー未登録</li>'}</ul><div class="attendance-actions"><button type="button" class="copy-surplus" data-copy-surplus="${esc(l.id)}">余り情報をコピー</button></div></details>`;
 }
 function japanDay(now=new Date()){return now.toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'})}
 function nextDay(day){return new Date(Date.parse(day+'T00:00:00Z')+86400000).toISOString().slice(0,10)}
@@ -664,7 +255,7 @@ function previousDay(day){return new Date(Date.parse(day+'T00:00:00Z')-86400000)
 function eventRank(l,today){if(l.lotteryDeadline===previousDay(today))return -1;if(l.date===today)return 0;if(l.lotteryDeadline===today)return 1;if(l.lotteryDeadline===nextDay(today))return 2;return 3}
 function sortedEvents(lives,today){return [...lives].sort((a,b)=>eventRank(a,today)-eventRank(b,today)||a.date.localeCompare(b.date)||a.title.localeCompare(b.title,'ja')||a.id.localeCompare(b.id))}
 function venueMapLink(value){const venue=String(value||'').trim();if(!venue)return '会場未登録';const url='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(venue);return `<a class="venue-map" href="${esc(url)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(venue)}をGoogleマップで検索（別画面で開く）" title="Googleマップで検索">${esc(venue)} <span aria-hidden="true">↗</span></a>`}
-function safeLink(url,label,sheet=false){const valid=sheet?/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url||''):/^https?:\/\/[a-zA-Z0-9.-]+(?::[0-9]+)?(?:[/?#][^\s<>]*)?$/.test(url||'');return valid?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`:`<p class="muted">${label}：未設定</p>`}
+function safeLink(url,label,sheet=false){const valid=sheet?/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url||''):/^https?:\/\/[a-zA-Z0-9.-]+(?::[0-9]+)?(?:[/?#][^\s<>]*)?$/.test(url||'');return valid?`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${label} ↗</a>`:`<span class="missing-link">${label}：未設定</span>`}
 
 function eventDateLabel(value){const d=new Date(value+'T12:00:00+09:00');return Number.isFinite(d.getTime())?d.toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',weekday:'short'}):value}
 function personalSurplusEvents(){return data.lives.filter(l=>l.date>=japanDay()).map(l=>({live:l,tickets:myTickets(l.id).filter(t=>t.status==='余り').sort((a,b)=>String(a.number).localeCompare(String(b.number),'ja',{numeric:true}))})).filter(x=>x.tickets.length).sort((a,b)=>a.live.date.localeCompare(b.live.date)||a.live.title.localeCompare(b.live.title,'ja'))}
@@ -700,23 +291,48 @@ async function copySurplus(l){
   }
 }
 function myApplicationStatus(l){const own=(data.attendance||[]).find(a=>a.liveId===l.id&&a.memberId===data.me.id);return own?.status==='不参加'?'申込不要':own?.applied||'未確認'}
+function stubDate(value){
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));
+  if(!m)return `<div class="ev-stub"><span class="ev-day">?</span></div>`;
+  const dow=new Date(Date.UTC(+m[1],+m[2]-1,+m[3])).getUTCDay(),name='日月火水木金土'[dow];
+  return `<time class="ev-stub" datetime="${esc(value)}" aria-label="${+m[2]}月${+m[3]}日(${name})"><span class="ev-month">${+m[2]}月</span><span class="ev-day">${+m[3]}</span><span class="ev-dow ${dow===0?'sun':dow===6?'sat':''}">(${name})</span></time>`;
+}
+function applicationFlag(application,needsApplication){
+  const label={'未確認':'申込未確認','未申込':'未申込','申込済み':'申込済み','申込不要':'申込不要'}[application]||application;
+  return `<span class="flag ${needsApplication?'todo':application==='申込済み'?'done':''}">${esc(label)}</span>`;
+}
 function eventTile(l,tickets,today){
   const after=Boolean(l.lotteryDeadline)&&today>l.lotteryDeadline,rank=eventRank(l,today);
-  const labels={'-1':'昨日抽選締切',0:'本日開催',1:'本日抽選締切',2:'明日抽選締切'};
   const ownRecord=(data.attendance||[]).find(a=>a.liveId===l.id&&a.memberId===data.me.id);
   const mine=ownRecord?.status||'未回答';
   const notAttending=mine==='不参加';
   const application=myApplicationStatus(l);
   const needsApplication=l.lotteryDeadline===today&&(application==='未確認'||application==='未申込');
-  const applicationControl=l.lotteryDeadline?'<div class="my-application"><label for="application-'+esc(l.id)+'">申込状況</label><select id="application-'+esc(l.id)+'" data-application="'+esc(l.id)+'" '+(notAttending?'disabled':'')+'><option value="未確認" '+(application==='未確認'?'selected':'')+'>未確認</option><option value="未申込" '+(application==='未申込'?'selected':'')+'>未申込</option><option value="申込済み" '+(application==='申込済み'?'selected':'')+'>申込済み</option><option value="申込不要" '+(application==='申込不要'?'selected':'')+'>申込不要</option></select>'+(notAttending?'<span class="application-auto">不参加のため申込不要</span>':'')+'</div>':'';
-  const extra=after?`<dl><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:`<dl><dt>抽選締切</dt><dd>${esc(l.lotteryDeadline||'未設定')}</dd><dt>投げ数</dt><dd>${l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定'}</dd></dl>${safeLink(l.purchaseUrl,'チケットURL')}${!l.lotteryDeadline?`<dl class="undated-surplus"><dt>全体あまり数</dt><dd>${tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length}枚</dd></dl>${safeLink(l.sheetUrl,'スプシURL',true)}`:''}`;
-  return `<article class="card event-tile ${rank===0?'today':rank<3?'deadline':''} ${needsApplication?'application-needed':''} ${l.archived?'archived-event':''}" data-event="${esc(l.id)}">
-    <div class="event-overview"><div class="event-dateline"><time class="date" datetime="${esc(l.date)}" title="${esc(l.date)}">${esc(eventDateLabel(l.date))}</time>${rank<3?`<span class="badge ${rank===0?'done':'pending'}">${labels[rank]}</span>`:''}${l.archived?'<span class="badge archived-badge">アーカイブ</span>':''}${l.lotteryDeadline?`<span class="application-pill ${needsApplication?'application-unresolved':application==='申込済み'?'application-complete':application==='申込不要'?'application-not-needed':'application-unsubmitted'}">申込 ${esc(application)}</span>`:''}</div>
-    <h2>${esc(l.title)}</h2><p class="muted event-venue">${venueMapLink(l.venue)}</p>${groupTags(l)}
-    <div class="my-attendance"><label for="attendance-${esc(l.id)}">自分の参戦予定</label><select id="attendance-${esc(l.id)}" data-attendance="${esc(l.id)}"><option value="" disabled ${mine==='未回答'?'selected':''}>未回答</option>${opts(['参戦','未定','不参加'],mine)}</select></div>${applicationControl}${l.memo?`<div class="event-memo"><span class="muted">メモ</span><p class="note">${esc(l.memo)}</p></div>`:''}<details class="memo-quick" ${canEditLive(l)?'':'hidden'}><summary>${l.memo?'メモを編集':'＋ メモを追加'}</summary><textarea data-memo-input="${esc(l.id)}" rows="2" maxlength="500" aria-label="${esc(l.title)}のメモ" placeholder="メモを入力">${esc(l.memo||'')}</textarea><button type="button" class="memo-save" data-save-memo="${esc(l.id)}">メモを保存</button></details></div>
-    <div class="event-facts">${extra}<div class="event-actions">${canEditLive(l)&&!archiveView?`<button class="edit-event" data-edit-live="${esc(l.id)}" aria-label="${esc(l.title)}を編集">編集</button><button class="archive-event" data-archive-live="${esc(l.id)}">アーカイブ</button>`:''}${canEditLive(l)&&archiveView&&l.date>=today?`<button class="restore-event" data-archive-live="${esc(l.id)}">アーカイブ解除</button>`:''}</div></div>
-    <button class="my-ticket-summary" data-register="${esc(l.id)}" aria-label="${esc(l.title)}の番号を登録・編集"><span class="ticket-summary-values">${myTicketSummary(l.id)}</span><span class="ticket-summary-action">登録・編集 <span aria-hidden="true">›</span></span></button>
-    <div class="event-footer">${attendanceDropdown(l)}<button class="copy-surplus" data-copy-surplus="${esc(l.id)}">余り情報をコピー</button></div>
+  const surplusCount=tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length;
+  const fact=(label,value,cls='')=>`<div${cls?` class="${cls}"`:''}><dt>${label}</dt><dd>${value}</dd></div>`;
+  const throwsValue=l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定';
+  const deadlineValue=l.lotteryDeadline?esc(eventDateLabel(l.lotteryDeadline)):'未設定';
+  const facts=after
+    ?`<div class="ev-facts-row"><dl class="ev-facts">${fact('全体あまり数',surplusCount+'枚')}</dl>${safeLink(l.sheetUrl,'スプシURL',true)}</div>`
+    :`<div class="ev-facts-row"><dl class="ev-facts">${fact('抽選締切',deadlineValue,l.lotteryDeadline===today?'is-deadline-today':'')}${fact('投げ数',throwsValue)}${!l.lotteryDeadline?fact('全体あまり数',surplusCount+'枚'):''}</dl>${safeLink(l.purchaseUrl,'チケットURL')}${!l.lotteryDeadline?safeLink(l.sheetUrl,'スプシURL',true):''}</div>`;
+  const flags=[
+    rank===0?'<span class="flag today">本日開催</span>':rank===1?'<span class="flag deadline">本日締切</span>':rank===2?'<span class="flag soon">明日締切</span>':rank===-1?'<span class="flag">昨日締切</span>':'',
+    l.archived?'<span class="flag">アーカイブ</span>':'',
+    l.lotteryDeadline&&(!after||application==='申込済み')?applicationFlag(application,needsApplication):''
+  ].join('');
+  const id=esc(l.id),title=esc(l.title);
+  const applicationControl=l.lotteryDeadline?`<div><label for="application-${id}">申込状況</label><select id="application-${id}" data-application="${id}" data-value="${esc(application)}" ${notAttending?'disabled':''}>${['未確認','未申込','申込済み','申込不要'].map(v=>`<option value="${v}" ${application===v?'selected':''}>${v}</option>`).join('')}</select>${notAttending?'<span class="application-auto">不参加のため申込不要</span>':''}</div>`:'';
+  const editable=canEditLive(l);
+  const menu=editable&&!archiveView
+    ?`<button type="button" class="edit-event" data-edit-live="${id}" aria-label="${title}を編集">イベントを編集</button><button type="button" data-open-memo="${id}">${l.memo?'メモを編集':'メモを追加'}</button><button type="button" class="archive-event" data-archive-live="${id}">アーカイブ</button>`
+    :editable&&archiveView&&l.date>=today?`<button type="button" class="restore-event" data-archive-live="${id}">アーカイブ解除</button>`:'';
+  return `<article class="event-tile ${rank===0?'is-today':rank===1||rank===2?'is-soon':''} ${needsApplication?'needs-action':''} ${l.archived?'is-archived':''}" data-event="${id}">
+    ${stubDate(l.date)}
+    <div class="ev-main"><div class="ev-flags">${flags}</div><h2 class="ev-title">${title}</h2><p class="event-venue">${venueMapLink(l.venue)}</p>${groupTags(l)}${facts}</div>
+    <div class="ev-me"><div><label for="attendance-${id}">参戦予定</label><select id="attendance-${id}" data-attendance="${id}" data-value="${esc(mine)}"><option value="" disabled ${mine==='未回答'?'selected':''}>未回答</option>${opts(['参戦','未定','不参加'],mine)}</select></div>${applicationControl}</div>
+    ${l.memo?`<div class="event-memo"><p class="note">${esc(l.memo)}</p></div>`:''}${editable?`<div class="memo-quick" data-memo-panel="${id}" hidden><label for="memo-${id}">メモ</label><textarea id="memo-${id}" data-memo-input="${id}" rows="2" maxlength="500" placeholder="メンバーに共有するメモ">${esc(l.memo||'')}</textarea><div class="memo-actions"><button type="button" data-cancel-memo="${id}">キャンセル</button><button type="button" class="primary memo-save" data-save-memo="${id}">メモを保存</button></div></div>`:''}
+    <button type="button" class="my-ticket-summary" data-register="${id}" aria-label="${title}の自分のチケット番号を登録・編集"><span class="ticket-summary-values">${myTicketSummary(l.id)}</span><span class="ticket-summary-action">番号を管理 ›</span></button>
+    <div class="event-footer">${attendanceDropdown(l)}${menu?`<details class="ev-more"><summary aria-label="${title}のその他の操作" title="その他の操作">…</summary><div class="ev-menu">${menu}</div></details>`:''}</div>
   </article>`;
 }
 function render(){
@@ -736,9 +352,9 @@ function updateSaveView(action){
     const id=card.dataset.event,live=data.lives.find(l=>l.id===id);if(!live)return;
     const select=card.querySelector('[data-attendance]');
     const ownRecord=data.attendance.find(a=>a.liveId===id&&a.memberId===data.me.id);
-    if(select)select.value=ownRecord?.status||'';
+    if(select){select.value=ownRecord?.status||'';select.dataset.value=ownRecord?.status||'未回答'}
     const application=card.querySelector('[data-application]');
-    if(application){const notAttending=ownRecord?.status==='不参加';application.value=notAttending?'申込不要':ownRecord?.applied||'未確認';application.disabled=notAttending;}
+    if(application){const notAttending=ownRecord?.status==='不参加';application.value=notAttending?'申込不要':ownRecord?.applied||'未確認';application.dataset.value=application.value;application.disabled=notAttending;}
     const details=card.querySelector('.tile-attendance');
     if(details){const template=document.createElement('template');template.innerHTML=attendanceDropdown(live);const fresh=template.content.firstElementChild;if(details.innerHTML!==fresh.innerHTML)details.innerHTML=fresh.innerHTML}
   });
@@ -770,40 +386,76 @@ async function lineSettingsForm(){
     });
   }catch(e){notice(e.message)}
 }
+function filterCount(){return (groupFilter?1:0)+(applicationFilter?1:0)+(myFilter!=='すべて'?1:0)}
+function updateFilterToggle(){const b=$('toggle-filters');if(!b)return;const n=filterCount();b.innerHTML='絞り込み'+(n?`<span class="filter-count">${n}</span>`:'');b.setAttribute('aria-expanded',String(mobileFiltersOpen))}
+function accountMenu(){
+  const name=esc(data.me.name),admin=data.me.isAdmin,role=admin?'管理者':'メンバー';
+  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><button type="button" id="logout">ログアウト</button></div></details>`;
+}
 function renderHome(){if(!data)return;const today=japanDay();lastDay=today;const todayPending=(data.lives||[]).filter(l=>!l.archived&&l.lotteryDeadline===today&&['未確認','未申込'].includes(myApplicationStatus(l))).length;const lives=sortedEvents(data.lives.filter(l=>archiveView?l.archived===true:(l.date>=today&&!l.archived)),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
-$('account').innerHTML=`<span class="account-name">${esc(data.me.name)}</span><span class="role-badge">${data.me.isAdmin?'管理者':'メンバー'}</span><button id="permissions-help" type="button">権限・できること</button>${data.me.isAdmin?'<button id="line-admin-settings" type="button">管理設定</button>':''}<button id="logout">ログアウト</button><button type="button" id="notification-settings">通知設定</button>`;$('logout').onclick=async()=>{if(busy)return;if(outbox.length){notice('保存の保留を解決してからログアウトしてください');return}confirmedData=null;rememberMember('');notice('');await auth?.signOut();chooseMemberScreen()};
-$('app').innerHTML=`<div id="sync-host">${syncPanel()}</div><div class="top"><div><h1 style="margin-top:6px">イベント一覧</h1></div><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>${`<div class="status-overview"><button type="button" id="today-application-alert" class="today-alert" data-application-filter="本日締切未対応"><span>本日締切の未申込・未確認</span><strong>${todayPending}</strong><span>件</span></button><button type="button" id="archive-toggle" class="archive-toggle" aria-pressed="${archiveView}">${archiveView?'開催予定に戻る':'アーカイブを見る'}</button><button type="button" id="toggle-filters" class="filter-toggle" aria-expanded="${mobileFiltersOpen}">絞り込み ${mobileFiltersOpen?'▲':'▼'}</button></div><div class="home-filters"><div><label for="search">イベントを探す</label><input id="search" type="search" class="search" placeholder="イベント名・会場・グループ" value="${esc(searchQuery)}"></div><div><label for="group-filter">出演グループ</label><select id="group-filter"><option value="">すべてのグループ</option>${groups.map(g=>`<option value="${esc(g)}" ${g===groupFilter?'selected':''}>${esc(g)}</option>`).join('')}</select></div><div><label for="application-filter">申込状況</label><select id="application-filter"><option value="">すべて</option><option value="未対応" ${applicationFilter==='未対応'?'selected':''}>未確認・未申込</option><option value="本日締切未対応" ${applicationFilter==='本日締切未対応'?'selected':''}>本日締切 未対応</option><option value="申込済み" ${applicationFilter==='申込済み'?'selected':''}>申込済み</option><option value="申込不要" ${applicationFilter==='申込不要'?'selected':''}>申込不要</option></select></div></div><div class="my-filters" role="group" aria-label="自分の状況で絞り込み">${['すべて','参戦予定','未回答','自分の余りあり'].map(f=>`<button data-my-filter="${f}" aria-pressed="${myFilter===f}">${f}</button>`).join('')}</div><div class="results-toolbar"><div class="results-info"><span id="event-count" role="status" aria-live="polite"></span><button id="my-surplus-list" class="my-surplus-list" aria-label="自分の余り一覧（開催予定の全イベント）">余り一覧 <strong>${personalSurplusEvents().reduce((n,x)=>n+x.tickets.length,0)}枚</strong></button><button id="clear-filters" hidden>絞り込み解除</button></div><div class="view-switch" role="group" aria-label="表示方法"><button data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button data-view="calendar" aria-pressed="${viewMode==='calendar'}">カレンダー</button></div></div><div class="event-grid ${viewMode==='list'||viewMode==='calendar'?'event-list':''}" id="lives"></div><p id="empty-events" class="empty" hidden></p>`}<p class="foot">最終読込 ${cachedView?'前回の表示（未更新） · ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}（日本時間）</p>`;
-$('app').classList.toggle('filters-expanded',mobileFiltersOpen);$('toggle-filters').onclick=()=>{mobileFiltersOpen=!mobileFiltersOpen;render()};$('archive-toggle').onclick=()=>{archiveView=!archiveView;applicationFilter='';render()};$('today-application-alert').onclick=()=>{archiveView=false;applicationFilter=applicationFilter==='本日締切未対応'?'':'本日締切未対応';render()};$('application-filter').onchange=e=>{applicationFilter=e.target.value;drawTiles(lives,today)};$('notification-settings').onclick=()=>import('./notifications.js').then(m=>m.open(memberId)).catch(()=>notice('通知設定を開けませんでした。再読込してください。'));if($('line-admin-settings'))$('line-admin-settings').onclick=lineSettingsForm;$('permissions-help').onclick=permissionInfo;document.querySelectorAll('[data-my-filter]').forEach(b=>b.onclick=()=>{myFilter=b.dataset.myFilter;render()});$('my-surplus-list').onclick=personalSurplusList;$('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();{drawTiles(lives,today);$('clear-filters').onclick=()=>{clearTimeout(searchTimer);searchQuery='';groupFilter='';applicationFilter='';myFilter='すべて';document.querySelectorAll('[data-my-filter]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.myFilter===myFilter));$('search').value='';$('group-filter').value='';$('application-filter').value='';drawTiles(lives,today)};$('group-filter').onchange=e=>{groupFilter=e.target.value;drawTiles(lives,today)};$('search').oninput=e=>{searchQuery=e.target.value;clearTimeout(searchTimer);searchTimer=setTimeout(()=>drawTiles(lives,today),120)};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{viewMode=b.dataset.view;try{localStorage.setItem('ticket-view-mode',viewMode)}catch(e){}render()})}showRefreshState();bindSyncPanel()}
+$('account').innerHTML=accountMenu();
+const closeAccount=()=>{const m=document.querySelector('.account-menu');if(m)m.open=false};
+$('logout').onclick=async()=>{closeAccount();if(busy)return;if(outbox.length){notice('保存の保留を解決してからログアウトしてください');return}confirmedData=null;rememberMember('');notice('');await auth?.signOut();chooseMemberScreen()};
+const surplusTotal=personalSurplusEvents().reduce((n,x)=>n+x.tickets.length,0);
+$('app').innerHTML=`<div id="sync-host">${syncPanel()}</div>
+<div class="home-head"><h1>${archiveView?'アーカイブ':'イベント一覧'}</h1><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>
+${archiveView?`<div class="archive-banner"><span>終了・アーカイブしたイベントを表示しています</span><button type="button" id="archive-exit">開催予定に戻る</button></div>`:todayPending?`<button type="button" id="today-application-alert" class="today-alert" aria-pressed="${applicationFilter==='本日締切未対応'}"><span>本日締切で申込が未対応</span><strong>${todayPending}</strong><span>件</span><span class="today-alert-action">${applicationFilter==='本日締切未対応'?'すべて表示':'絞り込む'}</span></button>`:''}
+<div class="filter-bar"><div><label for="search" class="sr-only">イベントを探す</label><input id="search" type="search" class="search" placeholder="イベント・会場・グループ" value="${esc(searchQuery)}"></div><button type="button" id="toggle-filters" class="filter-toggle" aria-expanded="${mobileFiltersOpen}" aria-controls="filter-panel"></button>
+<div class="filter-panel" id="filter-panel"><div class="filter-selects"><div><label for="group-filter">出演グループ</label><select id="group-filter"><option value="">すべてのグループ</option>${groups.map(g=>`<option value="${esc(g)}" ${g===groupFilter?'selected':''}>${esc(g)}</option>`).join('')}</select></div><div><label for="application-filter">申込状況</label><select id="application-filter"><option value="">申込状況：すべて</option><option value="未対応" ${applicationFilter==='未対応'?'selected':''}>未確認・未申込</option><option value="本日締切未対応" ${applicationFilter==='本日締切未対応'?'selected':''}>本日締切で未対応</option><option value="申込済み" ${applicationFilter==='申込済み'?'selected':''}>申込済み</option><option value="申込不要" ${applicationFilter==='申込不要'?'selected':''}>申込不要</option></select></div></div><div class="my-filters" role="group" aria-label="自分の状況で絞り込み">${['すべて','参戦予定','未回答','自分の余りあり'].map(f=>`<button type="button" data-my-filter="${f}" aria-pressed="${myFilter===f}">${f}</button>`).join('')}</div></div></div>
+<div class="results-toolbar"><div class="results-info"><span id="event-count" role="status" aria-live="polite"></span><button type="button" id="my-surplus-list" class="my-surplus-list" aria-label="自分の余り一覧（開催予定の全イベント）">自分の余り ${surplusTotal}枚</button><button type="button" id="clear-filters" hidden>絞り込み解除</button></div><div class="results-tools"><div class="view-switch" role="group" aria-label="表示方法"><button type="button" data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button type="button" data-view="calendar" aria-pressed="${viewMode==='calendar'}">カレンダー</button></div></div></div>
+<div class="event-grid event-list" id="lives"></div><p id="empty-events" class="empty" hidden></p>
+<p class="foot">最終読込 ${cachedView?'前回の表示（未更新） / ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}${archiveView?'':' · <button type="button" id="archive-toggle" class="archive-toggle" aria-pressed="false">アーカイブを見る</button>'}</p>`;
+$('app').classList.toggle('filters-expanded',mobileFiltersOpen);updateFilterToggle();
+$('toggle-filters').onclick=()=>{mobileFiltersOpen=!mobileFiltersOpen;$('app').classList.toggle('filters-expanded',mobileFiltersOpen);updateFilterToggle()};
+const toggleArchive=()=>{archiveView=!archiveView;applicationFilter='';render();window.scrollTo({top:0,behavior:'instant'})};
+if($('archive-toggle'))$('archive-toggle').onclick=toggleArchive;if($('archive-exit'))$('archive-exit').onclick=toggleArchive;
+if($('today-application-alert'))$('today-application-alert').onclick=()=>{archiveView=false;applicationFilter=applicationFilter==='本日締切未対応'?'':'本日締切未対応';render()};
+$('application-filter').onchange=e=>{applicationFilter=e.target.value;drawTiles(lives,today)};
+$('notification-settings').onclick=()=>{closeAccount();import('./notifications.js').then(m=>m.open(memberId)).catch(()=>notice('通知設定を開けませんでした。再読込してください。'))};
+if($('line-admin-settings'))$('line-admin-settings').onclick=()=>{closeAccount();lineSettingsForm()};
+$('permissions-help').onclick=()=>{closeAccount();permissionInfo()};
+document.querySelectorAll('[data-my-filter]').forEach(b=>b.onclick=()=>{myFilter=b.dataset.myFilter;document.querySelectorAll('[data-my-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.myFilter===myFilter)));drawTiles(lives,today)});
+$('my-surplus-list').onclick=personalSurplusList;$('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();
+{drawTiles(lives,today);$('clear-filters').onclick=()=>{clearTimeout(searchTimer);searchQuery='';groupFilter='';applicationFilter='';myFilter='すべて';document.querySelectorAll('[data-my-filter]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.myFilter===myFilter));$('search').value='';$('group-filter').value='';$('application-filter').value='';drawTiles(lives,today)};$('group-filter').onchange=e=>{groupFilter=e.target.value;drawTiles(lives,today)};$('search').oninput=e=>{searchQuery=e.target.value;clearTimeout(searchTimer);searchTimer=setTimeout(()=>drawTiles(lives,today),120)};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{viewMode=b.dataset.view;try{localStorage.setItem('ticket-view-mode',viewMode)}catch(e){}render()})}showRefreshState();bindSyncPanel()}
 function drawTiles(lives,today){
   const q=searchQuery.trim().normalize('NFKC').toLowerCase();
   const visible=lives.filter(l=>matchesMyFilter(l)&&(!applicationFilter||(applicationFilter==='本日締切未対応'?l.lotteryDeadline===today&&['未確認','未申込'].includes(myApplicationStatus(l)):applicationFilter==='未対応'?['未確認','未申込'].includes(myApplicationStatus(l)):myApplicationStatus(l)===applicationFilter))&&(!groupFilter||(l.groups||[]).includes(groupFilter))&&(l.title+' '+l.venue+' '+(l.groups||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q));
-  if($('event-count'))$('event-count').textContent=visible.length+'件'+(q||groupFilter||myFilter!=='すべて'||applicationFilter?' / 全'+lives.length+'件':'のイベント');
+  if($('event-count'))$('event-count').textContent=(q||groupFilter||myFilter!=='すべて'||applicationFilter?visible.length+'件 / 全'+lives.length+'件':visible.length+'件');
   if($('clear-filters'))$('clear-filters').hidden=!(q||groupFilter||myFilter!=='すべて'||applicationFilter);
+  updateFilterToggle();
   $('empty-events').hidden=visible.length>0;
   $('empty-events').textContent=archiveView?(lives.length?'該当するアーカイブはありません。':'アーカイブされたイベントはありません。'):lives.length?'該当するイベントはありません。':'「＋ イベント登録」からイベントを登録してください。';
   if(viewMode==='calendar'){renderCalendar(visible,today,lives);$('empty-events').hidden=true}
   else{$('lives').innerHTML=visible.map(l=>eventTile(l,data.tickets,today)).join('');bindEventCards()}
 }
 function bindEventCards(){
-  document.querySelectorAll('[data-copy-surplus]').forEach(b=>b.onclick=()=>copySurplus(data.lives.find(l=>l.id===b.dataset.copySurplus)));
+  const host=$('lives');if(!host)return;
+  host.onclick=e=>{
+    const copy=e.target.closest('[data-copy-surplus]');if(copy){copySurplus(data.lives.find(l=>l.id===copy.dataset.copySurplus));return}
+    const openMemo=e.target.closest('[data-open-memo]');if(openMemo){openMemo.closest('details').open=false;const panel=host.querySelector(`[data-memo-panel="${CSS.escape(openMemo.dataset.openMemo)}"]`);if(panel){panel.hidden=false;panel.querySelector('textarea').focus()}return}
+    const cancelMemo=e.target.closest('[data-cancel-memo]');if(cancelMemo){const panel=cancelMemo.closest('[data-memo-panel]'),live=data.lives.find(l=>l.id===cancelMemo.dataset.cancelMemo);panel.querySelector('textarea').value=live?.memo||'';panel.hidden=true;return}
+  };
   document.querySelectorAll('[data-register]').forEach(b=>b.onclick=()=>{if(busy)return;ticketManager(b.dataset.register)});
   document.querySelectorAll('[data-attendance]').forEach(el=>el.onchange=async()=>{
+    el.dataset.value=el.value;
     const liveId=el.dataset.attendance,mine=data.attendance.find(a=>a.liveId===liveId&&a.memberId===data.me.id);
     await save('attendance',{liveId,status:el.value,version:mine?.version});
     if(!$('modal').open)updateSaveView('attendance');
   });
   document.querySelectorAll('[data-application]').forEach(el=>el.onchange=async()=>{
+    el.dataset.value=el.value;
     const liveId=el.dataset.application,mine=data.attendance.find(a=>a.liveId===liveId&&a.memberId===data.me.id);
     await save('application',{liveId,applied:el.value,version:mine?.version});
   });
-  document.querySelectorAll('[data-edit-live]').forEach(b=>b.onclick=()=>liveForm(data.lives.find(l=>l.id===b.dataset.editLive)));document.querySelectorAll('[data-archive-live]').forEach(b=>b.onclick=()=>{const l=data.lives.find(x=>x.id===b.dataset.archiveLive);if(!l)return;const restoring=archiveView;if(restoring){save('restoreLive',{id:l.id,version:l.version})}else if(confirm('このイベントをアーカイブします。\n\n'+l.title+'\n開催日：'+l.date+'\n締切：'+(l.lotteryDeadline||'未設定')+'\n\n参戦予定・申込状況・チケット情報は保持されます。'))save('archiveLive',{id:l.id,version:l.version})});
+  document.querySelectorAll('[data-edit-live]').forEach(b=>b.onclick=()=>{b.closest('details')?.removeAttribute('open');liveForm(data.lives.find(l=>l.id===b.dataset.editLive))});
+  document.querySelectorAll('[data-archive-live]').forEach(b=>b.onclick=()=>{b.closest('details')?.removeAttribute('open');const l=data.lives.find(x=>x.id===b.dataset.archiveLive);if(!l)return;const restoring=archiveView;if(restoring){save('restoreLive',{id:l.id,version:l.version})}else if(confirm('このイベントをアーカイブします。\n\n'+l.title+'\n開催日：'+eventDateLabel(l.date)+'\n抽選締切：'+(l.lotteryDeadline?eventDateLabel(l.lotteryDeadline):'未設定')+'\n\n参戦予定・申込状況・チケット情報は保持されます。'))save('archiveLive',{id:l.id,version:l.version})});
   document.querySelectorAll('[data-save-memo]').forEach(b=>b.onclick=()=>{
     if(busy)return;
     const live=data.lives.find(l=>l.id===b.dataset.saveMemo);
-    const card=b.closest('[data-event]'),input=card?.querySelector('[data-memo-input]');
+    const panel=b.closest('[data-memo-panel]'),input=panel?.querySelector('[data-memo-input]');
     if(!live||!input)return;
     const memo=input.value.trim();
-    if(memo===(live.memo||'')){const details=b.closest('details');if(details)details.open=false;return}
+    if(memo===(live.memo||'')){panel.hidden=true;return}
     save('live',{...live,memo,version:live.version});
   });
 }
@@ -845,6 +497,7 @@ function renderCalendar(events,today,allLives){
   const label=calendarMonthLabel(calendarMonth);
   $('lives').innerHTML='<section class="calendar-view" aria-label="イベントカレンダー">'+
     '<div class="calendar-toolbar"><button type="button" data-cal-prev aria-label="前の月">‹</button><h2>'+label+'</h2><button type="button" data-cal-next aria-label="次の月">›</button><button type="button" class="calendar-today" data-cal-today>今月</button></div>'+
+    '<div class="calendar-legend" aria-hidden="true"><span><i></i>開催日</span><span><i class="deadline"></i>抽選締切</span></div>'+
     '<div class="calendar-grid" role="grid" aria-label="'+label+'">'+
     ['日','月','火','水','木','金','土'].map(day=>'<div class="calendar-weekday" role="columnheader">'+day+'</div>').join('')+cells.join('')+'</div>'+
     '<section class="calendar-agenda"><h2>'+calendarDateLabel(calendarSelectedDate)+'の予定</h2>'+
@@ -870,9 +523,9 @@ function ticketManager(liveId){
   managerLiveId=liveId;managerMode='list';
   const tickets=data.tickets.filter(t=>t.liveId===liveId&&t.memberId===data.me.id).sort((a,b)=>String(a.number).localeCompare(String(b.number),'ja',{numeric:true}));
   const pending=outbox.filter(item=>item.payload.liveId===liveId),failed=pending.some(item=>item.state==='error');
-  modal('番号登録・編集',`<p class="muted">${esc(data.me.name)}さんのチケット · ${tickets.length}枚</p><button type="button" class="primary manager-add" id="manager-add">＋ 番号を登録</button>${pending.length?`<p class="manager-sync" role="status">${failed?'保存を確認できません。閉じてTOPの「保存状況」を確認してください。':'スプシへ保存中… 保存中の番号は完了後に編集できます。'}</p>`:''}<div class="manager-tickets">${tickets.map(t=>`<div class="ticket"><div class="num">${esc(t.number||'番号未入力')}</div><div class="ticket-body"><label class="status-label" for="manage-status-${esc(t.id)}">捌き状況</label><div class="ticket-status-control"><select id="manage-status-${esc(t.id)}" data-manage-status="${esc(t.id)}" ${ticketPending(t)?'disabled':''}>${ticketStatusOptions(t.status)}</select><button type="button" class="cycle-status" data-cycle-status="${esc(t.id)}" aria-label="${esc(t.number||'チケット')}の捌き状況を次へ変更して保存" ${ticketPending(t)?'disabled':''}>次の状態へ</button></div>${t.recipient?`<p>譲り先：${esc(t.recipient)}</p>`:''}${t.memo?`<p class="muted">メモ：${esc(t.memo)}</p>`:''}<div class="ticket-copy-actions"><button type="button" class="copy-ticket-details-row" data-copy-ticket-details="${esc(t.id)}" ${!t.ticketUrl?'disabled':''}>チケット情報をコピー</button></div></div><button type="button" data-manage-ticket="${esc(t.id)}" aria-label="${esc(t.number||'番号未入力')}を編集・削除" ${ticketPending(t)?'disabled':''}>${ticketPending(t)?'保存待ち':'編集・削除'}</button></div>`).join('')||'<p class="empty">登録済みの番号はありません。</p>'}</div>`,()=>submitTicketStatuses(tickets));
-  $('submit-save').disabled=true;$('submit-save').textContent='変更なし';
-  const update=()=>{const count=statusChanges(tickets).length;modalDirty=count>0;$('submit-save').disabled=!count;$('submit-save').textContent=count?'変更した'+count+'枚を保存':'変更なし'};
+  modal('自分のチケット番号',`<p class="muted">${esc(data.me.name)}さんの番号：${tickets.length}枚</p><button type="button" class="primary manager-add" id="manager-add">＋ 番号を登録</button>${pending.length?`<p class="manager-sync" role="status">${failed?'保存を確認できません。閉じてTOPの「保存状況」を確認してください。':'スプシへ保存中… 保存中の番号は完了後に編集できます。'}</p>`:''}<div class="manager-tickets">${tickets.map(t=>`<div class="ticket"><div class="num">${esc(t.number||'番号未入力')}</div><div class="ticket-body"><label class="status-label" for="manage-status-${esc(t.id)}">捌き状況</label><div class="ticket-status-control"><select id="manage-status-${esc(t.id)}" data-manage-status="${esc(t.id)}" ${ticketPending(t)?'disabled':''}>${ticketStatusOptions(t.status)}</select><button type="button" class="cycle-status" data-cycle-status="${esc(t.id)}" aria-label="${esc(t.number||'チケット')}の捌き状況を次へ変更して保存" ${ticketPending(t)?'disabled':''}>次の状態へ</button></div>${t.recipient?`<p>譲り先：${esc(t.recipient)}</p>`:''}${t.memo?`<p class="muted">メモ：${esc(t.memo)}</p>`:''}<div class="ticket-copy-actions"><button type="button" class="copy-ticket-details-row" data-copy-ticket-details="${esc(t.id)}" ${!t.ticketUrl?'disabled':''}>チケット情報をコピー</button></div></div><button type="button" data-manage-ticket="${esc(t.id)}" aria-label="${esc(t.number||'番号未入力')}を編集・削除" ${ticketPending(t)?'disabled':''}>${ticketPending(t)?'保存待ち':'編集・削除'}</button></div>`).join('')||'<p class="empty">登録済みの番号はありません。</p>'}</div>`,()=>submitTicketStatuses(tickets));
+  $('submit-save').hidden=true;
+  const update=()=>{const count=statusChanges(tickets).length;modalDirty=count>0;$('submit-save').hidden=!count;$('submit-save').disabled=!count;$('submit-save').textContent='変更した'+count+'枚を保存'};
   $('form').onchange=update;document.querySelectorAll('[data-cycle-status]').forEach(b=>b.onclick=()=>{const select=$('manage-status-'+b.dataset.cycleStatus);if(!select||select.disabled)return;const index=statuses.indexOf(select.value);select.value=statuses[(index+1+statuses.length)%statuses.length];update();submitTicketStatuses(tickets)});
   $('manager-add').disabled=String(liveId).startsWith('pending-');
   $('manager-add').onclick=()=>{if(modalDirty&&!confirm('状況の変更を破棄して新規登録しますか？'))return;addForm()};
@@ -899,7 +552,7 @@ async function submitTicketStatuses(original){
   ++refreshVersion;loading=false;rebuildOptimistic();modalDirty=false;ticketManager(managerLiveId);notice(changes.length+'枚を反映しました。スプシへ保存中…');processOutbox();
 }
 function closeModal(){if(busy)return;if(modalDirty&&!confirm('入力中の内容を破棄して閉じますか？'))return;modalDirty=false;managerLiveId='';managerMode='';$('modal').close();if(data)render()}
-function modal(title,body,onSave){modalDirty=false;const live=/番号|チケット/.test(title)?data?.lives.find(l=>l.id===managerLiveId):null;$('modal').innerHTML=`<div class="modal-head"><h2 id="modal-title" tabindex="-1">${title}</h2>${live?`<p class="modal-context">${esc(live.title)}</p>`:''}</div><form id="form"><div class="modal-body">${body}</div><div id="form-message" class="form-message" role="alert"></div><div class="modal-actions"><button type="button" id="cancel">閉じる</button><button class="primary" id="submit-save">保存</button></div></form>`;$('cancel').textContent=managerLiveId&&managerMode!=='list'?'← 登録済み番号':'閉じる';$('cancel').onclick=managerLiveId&&managerMode!=='list'?backToTickets:closeModal;$('modal').oncancel=e=>{e.preventDefault();closeModal()};$('form').oninput=()=>modalDirty=true;$('form').onchange=()=>modalDirty=true;$('form').onsubmit=e=>{e.preventDefault();onSave(Object.fromEntries(new FormData(e.target)))};if(!$('modal').open)$('modal').showModal();$('modal').scrollTop=0;$('modal-title').focus()}
+function modal(title,body,onSave){modalDirty=false;const live=/番号|チケット/.test(title)?data?.lives.find(l=>l.id===managerLiveId):null;$('modal').innerHTML=`<div class="modal-head"><h2 id="modal-title" tabindex="-1">${title}</h2>${live?`<p class="modal-context">${esc(live.title)}</p>`:''}</div><form id="form"><div class="modal-body">${body}</div><div id="form-message" class="form-message" role="alert"></div><div class="modal-actions"><button type="button" id="cancel">閉じる</button><button class="primary" id="submit-save">保存</button></div></form>`;$('cancel').textContent=managerLiveId&&managerMode!=='list'?'← 番号一覧':'閉じる';$('cancel').onclick=managerLiveId&&managerMode!=='list'?backToTickets:closeModal;$('modal').oncancel=e=>{e.preventDefault();closeModal()};$('form').oninput=()=>modalDirty=true;$('form').onchange=()=>modalDirty=true;$('form').onsubmit=e=>{e.preventDefault();onSave(Object.fromEntries(new FormData(e.target)))};if(!$('modal').open)$('modal').showModal();$('modal').scrollTop=0;$('modal-title').focus()}
 
 function liveForm(l={}){if(busy)return;managerLiveId='';managerMode='';const available=[...new Set([...(data.groups||[]),...(l.groups||[])])].sort((a,b)=>a.localeCompare(b,'ja'));modal(l.id?'イベントを編集':'イベントを登録',field('日付','date',l.date,'date',true)+field('イベント名','title',l.title,'text',true,'event-title-options')+suggestionList('event-title-options',liveFieldOptions('title'))+field('会場','venue',l.venue,'text',false,'event-venue-options')+suggestionList('event-venue-options',liveFieldOptions('venue'))+field('チケット購入ページURL','purchaseUrl',l.purchaseUrl,'url')+field('抽選締切','lotteryDeadline',l.lotteryDeadline,'date')+`<label for="f-requiredThrows">投げ数</label><input id="f-requiredThrows" name="requiredThrows" type="number" min="0" step="1" value="${esc(l.requiredThrows??'')}" placeholder="未設定"><fieldset><legend>出演グループ（複数選択）</legend><div class="group-options">${available.map(g=>`<label class="group-choice"><input type="checkbox" name="group-option" value="${esc(g)}" ${(l.groups||[]).includes(g)?'checked':''}>${esc(g)}</label>`).join('')||'<span class="muted">グループは下の欄から追加できます。</span>'}</div><label for="new-groups">新しいグループを追加</label><input id="new-groups" name="newGroups" placeholder="例：グループA、グループB"><p class="muted form-hint">カンマ・読点で区切って入力。イベントの保存時に追加されます。</p></fieldset><div class="event-extra-fields">`+field('スプシURL','sheetUrl',l.sheetUrl,'url')+`<label for="memo">メモ</label><textarea id="memo" name="memo" maxlength="500">${esc(l.memo||'')}</textarea></div>`,p=>{const groups=[...document.querySelectorAll('#form input[name="group-option"]:checked')].map(el=>el.value).concat((p.newGroups||'').split(/[,、\n]+/).map(g=>g.trim()).filter(Boolean));rememberEventInput(p.title,p.venue);save('live',{...p,groups,id:l.id,version:l.version})});if(l.id){const remove=document.createElement('button');remove.type='button';remove.className='danger';remove.textContent='イベントをアーカイブ';const actions=document.querySelector('.modal-actions');actions.insertBefore(remove,$('submit-save'));remove.onclick=()=>{if(confirm('次のイベントをアーカイブします。\n\n'+l.title+'\n開催日：'+l.date+'\n締切：'+(l.lotteryDeadline||'未設定')+'\n\n参戦予定・申込状況・チケット情報は保持されます。'))save('archiveLive',{id:l.id,version:l.version,title:l.title})}}}
 function parseNumbers(value){return value.normalize('NFKC').trim().split(/[\s,、]+/).filter(Boolean)}
@@ -953,9 +606,11 @@ function addForm(){
 
 function ticketShareText(liveId,number,url){const live=data.lives.find(l=>l.id===liveId);return ['日付：'+(live?eventDateLabel(live.date):''),'イベント名：'+(live?.title||''),'チケット番号：'+String(number||'').trim(),'URL：'+String(url||'').trim()].join('\n')}
 async function copyTicketShare(liveId,number,url){const text=ticketShareText(liveId,number,url);try{await navigator.clipboard.writeText(text);notice('チケット情報をコピーしました');return true}catch(e){modal('チケット情報をコピー',`<p class="muted">下の内容を選択してコピーしてください。</p><textarea id="ticket-share-copy" readonly rows="5">${esc(text)}</textarea>`,()=>{});$('submit-save').hidden=true;$('ticket-share-copy').focus();$('ticket-share-copy').select()}}
-function ticketForm(t){if(busy||!t||t.memberId!==data.me.id||ticketPending(t))return;managerMode='edit';modal('チケットを編集',field('整理番号','number',t.number)+`<div id="duplicate-warning" class="duplicate-warning" role="status"></div><label for="status">状態</label><select id="status" name="status" required>${ticketStatusOptions(t.status,true)}</select>`+field('譲り先（任意）','recipient',t.recipient)+`<label for="memo">この番号のメモ</label><textarea id="memo" name="memo" maxlength="500" placeholder="例：〇〇さんに譲渡、受け渡し方法など">${esc(t.memo||'')}</textarea>`+field('本人用チケットURL（任意）','ticketUrl',t.ticketUrl,'url')+`<button type="button" id="copy-ticket-details" class="copy-ticket-details">日付・イベント名・番号・URLをコピー</button><p class="muted form-hint">名前選択は本人確認ではありません。他の人も名前を切り替えるとこのURLを見られます。</p><button class="danger" type="button" id="delete" style="margin-top:18px">このチケットを削除</button>`,p=>{if(normalizedNumber(p.number)!==normalizedNumber(t.number)&&!duplicateWarning(t.liveId,[p.number],t.id)){notice('登録済み番号を確認してください');return}save('ticket',{...p,id:t.id,liveId:t.liveId,version:t.version})});const updateCopy=()=>{$('copy-ticket-details').disabled=!($('f-number').value.trim()&&$('f-ticketUrl').value.trim())};$('copy-ticket-details').onclick=async()=>{if(await copyTicketShare(t.liveId,$('f-number').value,$('f-ticketUrl').value))$('copy-ticket-details').textContent='コピーしました'};$('f-number').oninput=()=>{duplicateWarning(t.liveId,normalizedNumber($('f-number').value)===normalizedNumber(t.number)?[]:[$('f-number').value],t.id);updateCopy()};$('f-ticketUrl').oninput=updateCopy;updateCopy();$('delete').onclick=()=>{if(confirm('このチケットを削除しますか？'))save('deleteTicket',{id:t.id,liveId:t.liveId,version:t.version})}}
-function showSetup(){ $('account').textContent='';$('app').innerHTML='<div class="card login"><span class="date">Ticket Management</span><h1 style="margin-top:12px">初期設定を準備中です</h1><p>イベント・チケットの保存先を接続すると利用できます。</p><p class="muted">幹事の方は設定手順に沿ってGASを公開し、そのURLを設定してください。メンバーの方の設定は不要です。</p><a href="https://github.com/M0CH4771/ticket-management#最初の設定" target="_blank" rel="noopener">設定手順を見る ↗</a></div>';finishStartup()}
+function ticketForm(t){if(busy||!t||t.memberId!==data.me.id||ticketPending(t))return;managerMode='edit';modal('チケットを編集',field('整理番号','number',t.number)+`<div id="duplicate-warning" class="duplicate-warning" role="status"></div><label for="status">状態</label><select id="status" name="status" required>${ticketStatusOptions(t.status,true)}</select>`+field('譲り先（任意）','recipient',t.recipient)+`<label for="memo">この番号のメモ</label><textarea id="memo" name="memo" maxlength="500" placeholder="例：〇〇さんに譲渡、受け渡し方法など">${esc(t.memo||'')}</textarea>`+field('本人用チケットURL（任意）','ticketUrl',t.ticketUrl,'url')+`<button type="button" id="copy-ticket-details" class="copy-ticket-details">日付・イベント名・番号・URLをコピー</button><p class="muted form-hint">チケットURL・メモ・譲り先は、ほかのメンバーには表示されません。</p><button class="danger" type="button" id="delete" style="width:100%;margin-top:18px">このチケットを削除</button>`,p=>{if(normalizedNumber(p.number)!==normalizedNumber(t.number)&&!duplicateWarning(t.liveId,[p.number],t.id)){notice('登録済み番号を確認してください');return}save('ticket',{...p,id:t.id,liveId:t.liveId,version:t.version})});const updateCopy=()=>{$('copy-ticket-details').disabled=!($('f-number').value.trim()&&$('f-ticketUrl').value.trim())};$('copy-ticket-details').onclick=async()=>{if(await copyTicketShare(t.liveId,$('f-number').value,$('f-ticketUrl').value))$('copy-ticket-details').textContent='コピーしました'};$('f-number').oninput=()=>{duplicateWarning(t.liveId,normalizedNumber($('f-number').value)===normalizedNumber(t.number)?[]:[$('f-number').value],t.id);updateCopy()};$('f-ticketUrl').oninput=updateCopy;updateCopy();$('delete').onclick=()=>{if(confirm('このチケットを削除しますか？'))save('deleteTicket',{id:t.id,liveId:t.liveId,version:t.version})}}
+function showSetup(){ $('account').textContent='';$('app').innerHTML='<div class="card login"><img class="login-mark" src="./icons/ticket-management.png?v=3" alt=""><h1>初期設定を準備中です</h1><p>イベント・チケットの保存先を接続すると利用できます。</p><p class="muted">幹事の方は設定手順に沿ってGASを公開し、そのURLを設定してください。メンバーの方の設定は不要です。</p><a href="https://github.com/M0CH4771/ticket-management#最初の設定" target="_blank" rel="noopener">設定手順を見る ↗</a></div>';finishStartup()}
 window.addEventListener('popstate',handleHistory);
+document.addEventListener('click',e=>{document.querySelectorAll('details.ev-more[open],details.account-menu[open]').forEach(d=>{if(!d.contains(e.target))d.open=false})});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const open=document.querySelector('details.ev-more[open],details.account-menu[open]');if(open){open.open=false;open.querySelector('summary').focus()}});
 history.replaceState({ticketView:'home'},'',location.pathname+location.search);
 if(!window.LIVE_POCKET_CONFIG?.gasUrl)showSetup();else chooseMemberScreen();
 </script></body></html>

@@ -2,12 +2,12 @@
   "id": "../",
   "name": "Ticket Management",
   "short_name": "Ticket",
-  "lang": "en",
+  "lang": "ja",
   "start_url": "./",
   "scope": "../",
   "display": "standalone",
-  "background_color": "#f4f5f7",
-  "theme_color": "#fffdf9",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "icons/ticket-management.png?v=3",
