@@ -97,8 +97,8 @@ function normalizeSheetDates_() {
 }
 function deletePastEvents_() {
   const s=sheet_('Lives'),rows=readTable_('Lives').display,today=japanToday_();
-  // Delete bottom-up so blank rows, adjacent events and references cannot shift targets.
-  // Only event rows are deleted. Member, attendance and ticket records are retained.
+  // Archive past events in place so linked attendance and ticket history remains available.
+  // Scan bottom-up to keep row locations stable while applying the archive flag.
   for(let i=rows.length-1;i>=1;i--) {
     const row=rows[i],date=normalizeDate_(row[2],Number(today.slice(0,4)));
     if(String(row[1]||'').trim() && date && date<today && String(row[12]||'')!=='yes') {s.getRange(i+1,13).setValue('yes');invalidate_('Lives');}
