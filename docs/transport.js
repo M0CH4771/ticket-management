@@ -1,10 +1,11 @@
 /* GitHub Pages -> isolated GAS iframe -> google.script.run.
- * No tokens, JSONP, no-cors writes, or automatic mutation retries.
+ * Auth tokens are passed only in RPC arguments, never in URLs or logs. No JSONP,
+ * no-cors writes, or automatic mutation retries.
  */
 (() => {
   const pending = new Map();
   let connection, dispose;
-  const methods = new Set(['getMembers', 'registerMember', 'getData', 'saveData', 'getPushSettings', 'savePushSubscription', 'removePushSubscription', 'testPushSubscription']);
+  const methods = new Set(['getAuthConfig', 'getMembers', 'registerMember', 'getData', 'saveData', 'getAdminSettings', 'saveAdminSettings', 'getPushSettings', 'savePushSubscription', 'removePushSubscription', 'testPushSubscription']);
   function validateEndpoint(value) {
     const url = new URL(value);
     if (url.origin !== 'https://script.google.com' || !/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url.pathname) || url.search || url.hash) throw new Error('GASの公開URL（末尾 /exec）を確認してください');
@@ -55,7 +56,7 @@
   }
   function call(method, ...args) {
     if (!methods.has(method)) return Promise.reject(new Error('未対応の操作です'));
-    const mutation = method === 'saveData' || method === 'registerMember' || method === 'savePushSubscription' || method === 'removePushSubscription' || method === 'testPushSubscription';
+    const mutation = method === 'saveData' || method === 'registerMember' || method === 'saveAdminSettings' || method === 'savePushSubscription' || method === 'removePushSubscription' || method === 'testPushSubscription';
     return new Promise((resolve, reject) => {
       const id = crypto.randomUUID();
       let settled = false;
@@ -71,11 +72,14 @@
       }, mutation ? 80000 : 30000);
       pending.set(id, {finish});
       try {
-        connect().then(({peer, peerOrigin, channel}) => {
-          if (settled) return;
-          try {peer.postMessage({type:'live-pocket-call', channel, id, method, args}, peerOrigin);}
-          catch (error) {finish(error);resetIdleConnection();}
-        }, error => {finish(error);resetIdleConnection();});
+        Promise.resolve().then(async()=>{
+          const callArgs=method==='getAuthConfig'?args:[await window.LivePocketAuth.getIdToken(),...args];
+          return connect().then(({peer,peerOrigin,channel})=>{
+            if(settled)return;
+            try{peer.postMessage({type:'live-pocket-call',channel,id,method,args:callArgs},peerOrigin);}
+            catch(error){finish(error);resetIdleConnection();}
+          });
+        }).catch(error=>{finish(error);resetIdleConnection()});
       } catch (error) {finish(error);resetIdleConnection();}
     });
   }

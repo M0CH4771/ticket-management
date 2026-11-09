@@ -1,14 +1,14 @@
 const TABLES = {
   Lives: ['id','title','date','venue','sheetUrl','memo','owner','version','lotteryDeadline','requiredThrows','purchaseUrl','groups'],
-  Members: ['id','name','tokenHash','active'],
-  Attendance: ['id','liveId','memberId','status','version'],
+  Members: ['id','name','tokenHash','active','email','role'],
+  Attendance: ['id','liveId','memberId','status','version','applied'],
   Tickets: ['id','liveId','memberId','number','status','recipient','memo','version','ticketUrl'],
 };
 // Column positions and internal keys remain stable; only sheet labels are translated.
 const HEADERS_JA = {
   Lives: ['イベントID（自動）','イベント名','開催日','会場','関連スプシURL','メモ','登録者ID','更新番号（自動）','抽選締切','必要投げ数（1人あたり）','チケット購入URL','出演グループ'],
-  Members: ['メンバーID（自動）','名前','旧認証情報（使用しません）','利用状態（yes / no）'],
-  Attendance: ['参戦予定ID','イベントID','メンバーID','参戦状況','更新番号'],
+  Members: ['メンバーID（自動）','名前','旧認証情報（使用しません）','利用状態（yes / no）','Googleアカウント','権限（admin / member）'],
+  Attendance: ['参戦予定ID','イベントID','メンバーID','参戦状況','更新番号','申込状況'],
   Tickets: ['チケットID','イベントID','メンバーID','整理番号','チケット状況','譲り先','メモ','更新番号','本人用チケットURL'],
 };
 function doGet(e) {
@@ -34,7 +34,7 @@ function setup_() {
       s.getRange(1,1,1,TABLES[name].length).setFontWeight('bold').setBackground('#dde8ff');
     });
     p.setProperty('SHEET_ID',ss.getId());
-    p.setProperty('SCHEMA_VERSION','japanese-headers-v4');
+    p.setProperty('SCHEMA_VERSION','japanese-headers-v5');
     console.log('管理スプレッドシート: '+ss.getUrl());
   } finally { lock.releaseLock(); }
 }
@@ -42,20 +42,21 @@ function ensureReady_(maintenance=true) {
   resetRequest_();
   const p=PropertiesService.getScriptProperties();
   if(!p.getProperty('SHEET_ID')) setup_();
-  if(!maintenance && p.getProperty('SCHEMA_VERSION')==='japanese-headers-v4') return;
+  if(!maintenance && p.getProperty('SCHEMA_VERSION')==='japanese-headers-v5') return;
   const lock=LockService.getScriptLock(); lock.waitLock(10000);
   try {
-    if(p.getProperty('SCHEMA_VERSION')!=='japanese-headers-v4') {
+    if(p.getProperty('SCHEMA_VERSION')!=='japanese-headers-v5') {
       // Validate every table before changing any header. Preserve all existing rows.
       Object.keys(TABLES).forEach(name=>{
         const headers=sheet_(name).getDataRange().getDisplayValues()[0]||[];
         TABLES[name].forEach((key,i)=>{
-          if(headers[i]!==key && headers[i]!==HEADERS_JA[name][i] && !((name==='Lives' && i>=8 || name==='Tickets' && i===8) && !headers[i]))
+          const additiveColumn=(name==='Members'&&i>=4)||(name==='Attendance'&&i>=5);
+          if(headers[i]!==key && headers[i]!==HEADERS_JA[name][i] && !((name==='Lives' && i>=8 || name==='Tickets' && i===8) && !headers[i]) && !(additiveColumn&&!headers[i]))
             throw new Error(name+'の列の順番を確認してください');
         });
       });
       Object.keys(TABLES).forEach(name=>sheet_(name).getRange(1,1,1,TABLES[name].length).setValues([HEADERS_JA[name]]).setFontWeight('bold').setBackground('#dde8ff'));
-      p.setProperty('SCHEMA_VERSION','japanese-headers-v4');
+      p.setProperty('SCHEMA_VERSION','japanese-headers-v5');
     }
     if(maintenance) {normalizeSheetDates_();fillSheetIds_();deletePastEvents_();}
     SpreadsheetApp.flush();
@@ -131,19 +132,24 @@ function fillSheetIds_() {
     });
   });
 }
-function getMembers() {
+function getMembers(idToken) {
   ensureReady_();
-  return rows_('Members').filter(m=>m.active==='yes').map(m=>({id:m.id,name:m.name})).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  const me=authenticatedMember_(idToken);
+  return [{id:me.id,name:me.name}];
 }
 function normalizedName_(name) { return String(name).normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase(); }
-function registerMember(name) {
+function registerMember(idToken,name,email) {
   ensureReady_(false);
+  const actor=authenticatedMember_(idToken);
+  if(actor.role!=='admin')throw new Error('メンバー登録は管理者のみ実行できます');
   const lock=LockService.getScriptLock(); lock.waitLock(10000);
   try {
-    requestTables={}; // Re-read after acquiring the write lock.
+    requestTables={};
     const displayName=text_(name,40,true).normalize('NFKC').replace(/\s+/g,' ');
-    if(rows_('Members').some(m=>normalizedName_(m.name)===normalizedName_(displayName))) throw new Error('その名前は登録済みです。一覧から選ぶか、区別できる名前にしてください');
-    const member={id:Utilities.getUuid(),name:displayName,tokenHash:'',active:'yes'};
+    const normalizedEmail=normalizeEmail_(email);
+    if(!normalizedEmail)throw new Error('Googleアカウントのメールアドレスを入力してください');
+    if(rows_('Members').some(m=>m.active==='yes'&&(normalizedName_(m.name)===normalizedName_(displayName)||normalizeEmail_(m.email)===normalizedEmail))) throw new Error('名前またはGoogleアカウントは登録済みです');
+    const member={id:Utilities.getUuid(),name:displayName,tokenHash:'',active:'yes',email:normalizedEmail,role:'member'};
     write_('Members',member,null); SpreadsheetApp.flush();
     return {id:member.id,name:member.name};
   } finally { lock.releaseLock(); }
@@ -166,17 +172,10 @@ function readTable_(name,includeRaw=false) {
 }
 function rows_(name) { return readTable_(name).display.slice(1).map(r => Object.fromEntries(TABLES[name].map((k,i)=>[k,r[i]??'']))); }
 function canEditLive_(live,me) {
-  // Events are shared: every selected active member may edit them.
-  return !!me && me.active==='yes';
+  return !!me && me.active==='yes' && (me.role==='admin' || live.owner===me.id);
 }
 // A selected name is a convenience label, not authentication.
 // Anyone with the app URL can select any active member.
-function selectedMember_(memberId) {
-  if(typeof memberId!=='string') throw new Error('名前を選び直してください');
-  const me=rows_('Members').find(m=>m.active==='yes'&&m.id===memberId);
-  if(!me) throw new Error('名前を選び直してください');
-  return me;
-}
 function readGroups_(value) {
   if(Array.isArray(value)) return value;
   try { const parsed=JSON.parse(value||'[]'); return Array.isArray(parsed)?parsed.filter(x=>typeof x==='string'):[]; } catch(e) { return []; }
@@ -190,9 +189,84 @@ function validateGroups_(value) {
 function snapshot_(me) {
   const lives=rows_('Lives').filter(l=>l.id&&l.title&&normalizeDate_(l.date,Number(japanToday_().slice(0,4)))).map(l=>({...l,groups:readGroups_(l.groups)}));
   const groups=[...new Set(lives.flatMap(l=>l.groups))].sort((a,b)=>a.localeCompare(b,'ja'));
-  return {me:{id:me.id,name:me.name},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives,groups,attendance:rows_('Attendance'),tickets:rows_('Tickets'),capabilities:{durableSave:true},updatedAt:new Date().toISOString()};
+  return {me:{id:me.id,name:me.name,isAdmin:me.role==='admin'},members:rows_('Members').filter(x=>x.active==='yes').map(x=>({id:x.id,name:x.name})),lives,groups,attendance:rows_('Attendance'),tickets:rows_('Tickets'),capabilities:{durableSave:true},updatedAt:new Date().toISOString()};
 }
-function getData(memberId) { ensureReady_(); return snapshot_(selectedMember_(memberId)); }
+function firebaseAuthConfig_() {
+  try {
+    const p=PropertiesService.getScriptProperties();
+    const raw=JSON.parse(p.getProperty('FIREBASE_AUTH_CONFIG')||p.getProperty('PUSH_FIREBASE_CONFIG')||'{}');
+    if(!raw.apiKey||!raw.projectId||!raw.appId||!raw.messagingSenderId)return null;
+    return {apiKey:raw.apiKey,projectId:raw.projectId,appId:raw.appId,messagingSenderId:raw.messagingSenderId,authDomain:raw.authDomain||raw.projectId+'.firebaseapp.com'};
+  } catch(e) { return null; }
+}
+function getAuthConfig() {
+  const firebase=firebaseAuthConfig_();
+  return firebase?{ready:true,firebase}:{ready:false};
+}
+function normalizeEmail_(value) {
+  const email=String(value||'').trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)?email:'';
+}
+function authenticatedMember_(idToken) {
+  resetRequest_();
+  if(typeof idToken!=='string'||idToken.length<100||idToken.length>5000)throw new Error('ログインの有効期限が切れました。再度ログインしてください');
+  const cache=CacheService.getScriptCache();
+  const cacheKey='auth-email-'+Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,idToken)).slice(0,40);
+  let email=cache.get(cacheKey);
+  if(!email) {
+    const config=firebaseAuthConfig_();
+    if(!config)throw new Error('Firebase Authenticationの設定が必要です');
+    const response=UrlFetchApp.fetch('https://identitytoolkit.googleapis.com/v1/accounts:lookup?key='+encodeURIComponent(config.apiKey),{
+      method:'post',contentType:'application/json',muteHttpExceptions:true,payload:JSON.stringify({idToken})
+    });
+    if(response.getResponseCode()!==200)throw new Error('ログインを確認できません。再度ログインしてください');
+    let result={};try{result=JSON.parse(response.getContentText())}catch(e){}
+    const account=result.users?.[0];
+    if(!account||account.disabled||!account.emailVerified)throw new Error('確認済みのGoogleアカウントでログインしてください');
+    email=normalizeEmail_(account.email);
+    if(!email)throw new Error('Googleアカウントのメールアドレスを取得できませんでした');
+    cache.put(cacheKey,email,240);
+  }
+  const member=rows_('Members').find(m=>m.active==='yes'&&normalizeEmail_(m.email)===email);
+  if(!member)throw new Error('このGoogleアカウントは未登録です。管理者にメンバー登録を依頼してください');
+  return member;
+}
+function selectedMember_(memberId,idToken) {
+  const me=authenticatedMember_(idToken);
+  if(typeof memberId!=='string'||me.id!==memberId)throw new Error('このGoogleアカウントに登録されたメンバーではありません');
+  return me;
+}
+function adminSettings_() {
+  const p=PropertiesService.getScriptProperties();
+  return {
+    dayTime:p.getProperty('LINE_DAY_TIME')||'12:00',
+    nightTime:p.getProperty('LINE_NIGHT_TIME')||'21:00',
+    dayMode:p.getProperty('LINE_DAY_MODE')||'all',
+    nightMode:p.getProperty('LINE_NIGHT_MODE')||'unconfirmed'
+  };
+}
+function getAdminSettings(idToken) {
+  const actor=authenticatedMember_(idToken);
+  if(actor.role!=='admin')throw new Error('管理者のみ設定を確認できます');
+  return adminSettings_();
+}
+function saveAdminSettings(idToken,settings) {
+  const actor=authenticatedMember_(idToken);
+  if(actor.role!=='admin')throw new Error('管理者のみ設定を変更できます');
+  const s=settings||{},timeValue=value=>{
+    const t=String(value||'');
+    if(!/^([01]\d|2[0-3]):([0-5]\d)$/.test(t)||Number(t.slice(3))%5!==0)throw new Error('配信時刻は5分単位で設定してください');
+    return t;
+  };
+  const dayTime=timeValue(s.dayTime),nightTime=timeValue(s.nightTime);
+  const day=Number(dayTime.slice(0,2))*60+Number(dayTime.slice(3)),night=Number(nightTime.slice(0,2))*60+Number(nightTime.slice(3));
+  if(day>=night||night-day<60)throw new Error('昼の配信時刻は夜より1時間以上前に設定してください');
+  const mode=value=>{if(!['all','unconfirmed'].includes(value))throw new Error('通知内容を選択してください');return value};
+  const p=PropertiesService.getScriptProperties();
+  p.setProperties({LINE_DAY_TIME:dayTime,LINE_NIGHT_TIME:nightTime,LINE_DAY_MODE:mode(s.dayMode),LINE_NIGHT_MODE:mode(s.nightMode)});
+  return adminSettings_();
+}
+function getData(idToken,memberId) { ensureReady_(); return snapshot_(selectedMember_(memberId,idToken)); }
 function text_(value,max,required) { const s=String(value==null?'':value).trim(); if ((required&&!s)||s.length>max) throw new Error('入力内容・文字数を確認してください'); return s; }
 function deadline_(value) {
   const s=text_(value,10,false);
@@ -256,14 +330,14 @@ function prepareSave_() {
   SpreadsheetApp.flush(); // Persist intent before changing user data.
   r.prepared=true;
 }
-function saveData(memberId,action,payload,options) {
+function saveData(idToken,memberId,action,payload,options) {
   // Save only the requested change; bulk import/cleanup run on reload or daily trigger.
   requestReceipt=null;
   ensureReady_(false);
   const lock=LockService.getScriptLock(); if(!lock.tryLock(10000)) throw new Error('更新が混み合っています。少し待って再度保存してください');
   try {
     requestTables={}; // Discard reads made before this write lock.
-    const me=selectedMember_(memberId); const p=payload||{};
+    const me=selectedMember_(memberId,idToken); const p=payload||{};
     if(options?.requestId){
       const id=String(options.requestId);
       if(!/^[a-f0-9-]{36}$/.test(id))throw new Error('保存リクエストが不正です');
@@ -285,7 +359,7 @@ function saveData(memberId,action,payload,options) {
       const date=normalizeDate_(p.date,Number(japanToday_().slice(0,4))); if(!date) throw new Error('日付を確認してください');
       if(date<japanToday_()) throw new Error('終了済みのイベントは登録できません');
       const url=text_(p.sheetUrl,600,false); if(url&&!/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(url)) throw new Error('スプレッドシートURLを確認してください');
-      write_('Lives',{id:old?old.id:Utilities.getUuid(),title:text_(p.title,120,true),date,groups:JSON.stringify(validateGroups_(p.groups===undefined?readGroups_(old?.groups):p.groups)),purchaseUrl:purchaseUrl_(p.purchaseUrl===undefined?old?.purchaseUrl:p.purchaseUrl),lotteryDeadline:deadline_(p.lotteryDeadline===undefined?old?.lotteryDeadline:p.lotteryDeadline),requiredThrows:throws_(p.requiredThrows===undefined?old?.requiredThrows:p.requiredThrows),venue:text_(p.venue,120,false),sheetUrl:url,memo:text_(p.memo,500,false),owner:me.id,version:old?Number(old.version)+1:1},old);
+      write_('Lives',{id:old?old.id:Utilities.getUuid(),title:text_(p.title,120,true),date,groups:JSON.stringify(validateGroups_(p.groups===undefined?readGroups_(old?.groups):p.groups)),purchaseUrl:purchaseUrl_(p.purchaseUrl===undefined?old?.purchaseUrl:p.purchaseUrl),lotteryDeadline:deadline_(p.lotteryDeadline===undefined?old?.lotteryDeadline:p.lotteryDeadline),requiredThrows:throws_(p.requiredThrows===undefined?old?.requiredThrows:p.requiredThrows),venue:text_(p.venue,120,false),sheetUrl:url,memo:text_(p.memo,500,false),owner:old?.owner||me.id,version:old?Number(old.version)+1:1},old);
     } else if(action==='deleteLive') {
       const live=rows_('Lives').find(x=>x.id===p.id);
       if(!live) throw new Error('ライブが見つかりません');
@@ -304,7 +378,12 @@ function saveData(memberId,action,payload,options) {
       if(action==='attendance') {
         const old=rows_('Attendance').find(x=>x.liveId===p.liveId&&x.memberId===me.id);
         if(old && String(p.version)!==old.version) throw new Error('他の更新がありました。再読込してください');
-        write_('Attendance',{id:old?old.id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,status:enum_(p.status,['参戦','未定','不参加']),version:old?Number(old.version)+1:1},old);
+        write_('Attendance',{id:old?old.id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,status:enum_(p.status,['参戦','未定','不参加']),applied:old?.applied||'',version:old?Number(old.version)+1:1},old);
+      } else if(action==='application') {
+        const old=rows_('Attendance').find(x=>x.liveId===p.liveId&&x.memberId===me.id);
+        if(old&&p.version!==undefined&&String(p.version)!==old.version)throw new Error('申込状況が更新されています。再読込してください');
+        const applied=enum_(p.applied,['申込済み','申込不要','未確認']);
+        write_('Attendance',{id:old?old.id:Utilities.getUuid(),liveId:p.liveId,memberId:me.id,status:old?.status||'',applied:applied==='未確認'?'':applied,version:old?Number(old.version)+1:1},old);
       } else if(action==='addTickets') {
         // Accept the old uniform-status payload as well as per-ticket entries.
         const input=p.entries!==undefined?p.entries:(Array.isArray(p.numbers)?p.numbers.map(number=>({number,status:p.status})):null);

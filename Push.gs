@@ -34,7 +34,8 @@ function pushFilterEvents_(lives,groups) {
   if(!Array.isArray(groups)||!groups.length)return [];
   return lives.filter(l=>pushEventGroups_(l).some(g=>groups.includes(g)));
 }
-function getPushSettings(id,secret,includeGroups) {
+function getPushSettings(idToken,id,secret,includeGroups) {
+  authenticatedMember_(idToken);
   const config=pushConfig_();
   const result=config&&pushProperties_().getProperty('PUSH_ENABLED')==='yes'?{ready:true,...config,groupFiltering:true}:{ready:false,groupFiltering:true};
   if(includeGroups) {
@@ -58,9 +59,10 @@ function pushIdentity_(id,secret) {
   if(!/^[a-f0-9-]{36}$/.test(id||'')||!/^[a-f0-9]{64}$/.test(secret||'')) throw new Error('通知の登録情報が無効です');
   return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,secret));
 }
-function savePushSubscription(memberId,device) {
-  if(!getPushSettings().ready) throw new Error('通知は管理者の初期設定待ちです');
-  resetRequest_();selectedMember_(memberId);
+function savePushSubscription(idToken,memberId,device) {
+  authenticatedMember_(idToken);
+  if(!pushConfig_()||pushProperties_().getProperty('PUSH_ENABLED')!=='yes') throw new Error('通知は管理者の初期設定待ちです');
+  resetRequest_();selectedMember_(memberId,idToken);
   const hash=pushIdentity_(device?.id,device?.secret);
   if(typeof device.token!=='string'||!device.token||device.token.length>2000||!/^[A-Za-z0-9_:.-]+$/.test(device.token)) throw new Error('通知の宛先が無効です');
   const lock=LockService.getUserLock();lock.waitLock(10000);
@@ -85,7 +87,8 @@ function savePushSubscription(memberId,device) {
     return {enabled:true,groups,groupFiltering:true};
   } finally { lock.releaseLock(); }
 }
-function removePushSubscription(id,secret) {
+function removePushSubscription(idToken,id,secret) {
+  authenticatedMember_(idToken);
   const hash=pushIdentity_(id,secret),lock=LockService.getUserLock();lock.waitLock(10000);
   try {
     const p=pushProperties_(),key=PUSH_DEVICE_PREFIX_+id,prior=JSON.parse(p.getProperty(key)||'null');
@@ -160,35 +163,39 @@ function pushBody_(lives) {
 }
 function sendDeadlinePush_() {
   const now=new Date(),today=Utilities.formatDate(now,'Asia/Tokyo','yyyy-MM-dd');
-  if(Number(Utilities.formatDate(now,'Asia/Tokyo','H'))<12||(!getPushSettings().ready&&!lineConfig_().ready))return;
+  const hour=Number(Utilities.formatDate(now,'Asia/Tokyo','H')),minute=Number(Utilities.formatDate(now,'Asia/Tokyo','m'));
+  const minuteOfDay=hour*60+minute,lineReady=lineConfig_().ready;
+  const p=pushProperties_(),pushReady=!!pushConfig_()&&p.getProperty('PUSH_ENABLED')==='yes';
+  if(!lineReady&&(!pushReady||hour<12))return;
   const lock=LockService.getUserLock();if(!lock.tryLock(1000))return;
   try {
     resetRequest_();
-    const p=pushProperties_(),config=pushConfig_(),line=lineConfig_();
+    const config=pushConfig_(),line=lineConfig_(),settings=adminSettings_();
     const lives=pushDueEvents_(rows_('Lives'),today);if(!lives.length)return;
     if(line.ready) {
-      const hour=Number(Utilities.formatDate(now,'Asia/Tokyo','H'));
-      const lineSlot=hour>=21&&hour<22?'21':hour>=12&&hour<13?'12':'';
+      const dayStart=Number(settings.dayTime.slice(0,2))*60+Number(settings.dayTime.slice(3));
+      const nightStart=Number(settings.nightTime.slice(0,2))*60+Number(settings.nightTime.slice(3));
+      const lineSlot=minuteOfDay>=nightStart?'night':minuteOfDay>=dayStart&&minuteOfDay<nightStart?'day':'';
       if(lineSlot) {
-        const sentKey='LINE_SENT_'+lineSlot+'_DAY';
-        const attemptDayKey='LINE_'+lineSlot+'_ATTEMPT_DAY';
-        const attemptsKey='LINE_'+lineSlot+'_ATTEMPTS';
-        const nextAttemptKey='LINE_'+lineSlot+'_NEXT_ATTEMPT';
-        const legacyNoonSent=lineSlot==='12'&&p.getProperty('LINE_SENT_DAY')===today;
+        const sentKey='LINE_SENT_'+lineSlot.toUpperCase()+'_DAY';
+        const attemptDayKey='LINE_'+lineSlot.toUpperCase()+'_ATTEMPT_DAY';
+        const attemptsKey='LINE_'+lineSlot.toUpperCase()+'_ATTEMPTS';
+        const nextAttemptKey='LINE_'+lineSlot.toUpperCase()+'_NEXT_ATTEMPT';
+        const legacySentToday=(lineSlot==='day'&&settings.dayTime==='12:00'&&(p.getProperty('LINE_SENT_DAY')===today||p.getProperty('LINE_SENT_12_DAY')===today))||(lineSlot==='night'&&settings.nightTime==='21:00'&&p.getProperty('LINE_SENT_21_DAY')===today);
         const attemptDay=p.getProperty(attemptDayKey)||'',attempts=Number(p.getProperty(attemptsKey)||0),nextAttempt=Number(p.getProperty(nextAttemptKey)||0);
-        if(p.getProperty(sentKey)!==today&&!legacyNoonSent&&!(attemptDay===today&&(attempts>=3||nextAttempt>Date.now()))) {
+        if(p.getProperty(sentKey)!==today&&!legacySentToday&&!(attemptDay===today&&(attempts>=3||nextAttempt>Date.now()))) {
           p.setProperty(attemptDayKey,today);p.setProperty(attemptsKey,String(attemptDay===today?attempts+1:1));p.setProperty(nextAttemptKey,String(Date.now()+15*60000));
           try {
-            const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+line.token},muteHttpExceptions:true,payload:JSON.stringify({to:line.groupId,messages:[{type:'text',text:lineBody_(lives,today)}]})});
+            const response=UrlFetchApp.fetch('https://api.line.me/v2/bot/message/push',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+line.token},muteHttpExceptions:true,payload:JSON.stringify({to:line.groupId,messages:[{type:'text',text:lineBody_(lives,today,lineSlot==='day'?settings.dayMode:settings.nightMode)}]})});
             if(response.getResponseCode()===200) {
               p.setProperty(sentKey,today);
-              if(lineSlot==='12')p.setProperty('LINE_SENT_DAY',today);
+              if(lineSlot==='day')p.setProperty('LINE_SENT_DAY',today);
             } else p.setProperty('LINE_LAST_STATUS','HTTP '+response.getResponseCode());
           } catch(e) { p.setProperty('LINE_LAST_STATUS','network-error'); }
         }
       }
     }
-    if(!config||p.getProperty('PUSH_ENABLED')!=='yes')return;
+    if(!config||p.getProperty('PUSH_ENABLED')!=='yes'||hour<12)return;
     const entries=Object.entries(p.getProperties()).filter(([key])=>key.startsWith(PUSH_DEVICE_PREFIX_));
     const due=entries.map(([key,value])=>({key,...JSON.parse(value)})).map(d=>({...d,events:pushFilterEvents_(lives,d.groups)})).filter(d=>d.enabled&&d.token&&d.events.length&&d.sentDay!==today&&!(d.attemptDay===today&&(d.attempts>=3||d.nextAttempt>Date.now()))).slice(0,10);
     if(!due.length)return;
@@ -198,7 +205,7 @@ function sendDeadlinePush_() {
       const {key,events,...record}=d;
       record.attempts=d.attemptDay===today?(d.attempts||0)+1:1;
       record.attemptDay=today;record.nextAttempt=Date.now()+15*60000;
-      p.setProperty(key,JSON.stringify(record)); // Reserve before sending; recover after transient failure.
+      p.setProperty(key,JSON.stringify(record));
       try {
         const response=UrlFetchApp.fetch('https://fcm.googleapis.com/v1/projects/'+encodeURIComponent(config.config.projectId)+'/messages:send',{
           method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+access},muteHttpExceptions:true,
@@ -219,8 +226,28 @@ function sendDeadlinePush_() {
     p.setProperty('PUSH_LAST_RUN',now.toISOString());
   } finally { lock.releaseLock(); }
 }
-function lineBody_(events,today) {
+function lineBody_(events,today,mode) {
   const lines=['【本日締切】'];let included=0;
+  if(mode==='unconfirmed') {
+    const members=rows_('Members').filter(m=>m.active==='yes');
+    const statuses=rows_('Attendance');
+    const pending=events.map(l=>{
+      const names=members.filter(m=>{
+        const record=statuses.find(a=>a.liveId===l.id&&a.memberId===m.id);
+        return !record||!['申込済み','申込不要'].includes(record.applied);
+      }).map(m=>m.name);
+      return {live:l,names};
+    }).filter(x=>x.names.length);
+    if(!pending.length)return '【本日締切】\n申込状況の未確認はありません。';
+    for(const item of pending) {
+      const l=item.live,eventDate=normalizeDate_(l.date,Number(today.slice(0,4)))||String(l.date||'未登録');
+      const block=['','開催日：'+eventDate.replace(/-/g,'/'),'イベント名：'+String(l.title||'未登録'),'未確認：'+item.names.join('、')].join('\n');
+      if(lines.join('\n').length+block.length>4500)break;
+      lines.push(block);included++;
+    }
+    if(included<pending.length)lines.push('','ほか'+(pending.length-included)+'件（文字数上限のため省略）');
+    return lines.join('\n');
+  }
   for(const l of events) {
     const eventDate=normalizeDate_(l.date,Number(today.slice(0,4)))||String(l.date||'未登録');
     const block=['','開催日：'+eventDate.replace(/-/g,'/'),'イベント名：'+String(l.title||'未登録'),'チケットURL：'+(l.purchaseUrl||'未登録'),'枠数：'+(l.requiredThrows!==''&&l.requiredThrows!=null?l.requiredThrows+'枚':'未設定')].join('\n');
@@ -231,7 +258,8 @@ function lineBody_(events,today) {
   return lines.join('\n');
 }
 // Explicit device-only test; never broadcasts and never exposes tokens.
-function testPushSubscription(id,secret) {
+function testPushSubscription(idToken,id,secret) {
+  authenticatedMember_(idToken);
   const hash=pushIdentity_(id,secret),lock=LockService.getUserLock();lock.waitLock(10000);
   try {
     const p=pushProperties_(),key=PUSH_DEVICE_PREFIX_+id,record=JSON.parse(p.getProperty(key)||'null');
