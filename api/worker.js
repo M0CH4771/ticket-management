@@ -578,6 +578,7 @@ function pushBody(lives) {
   lines.push('タップしてイベントを確認');
   return lines.join('\n');
 }
+const lineEventLines = l => ['', '開催日：' + slash(l.date), 'イベント名：' + l.title, 'チケットURL：' + (l.purchase_url || '未登録'), '枠数：' + (l.required_throws !== '' ? l.required_throws + '枚' : '未設定')];
 async function lineBody(db, events, mode) {
   const lines = ['【本日締切】']; let included = 0;
   const add = (block, total) => { if (lines.join('\n').length + block.length > 4500) return false; lines.push(block); included++; return true; };
@@ -589,11 +590,11 @@ async function lineBody(db, events, mode) {
       return !record || (record.status !== '不参加' && !['申込済み', '申込不要'].includes(record.applied));
     }).map(m => m.name) })).filter(x => x.names.length);
     if (!pending.length) return '【本日締切】\n申込状況の未確認はありません。';
-    for (const item of pending) if (!add(['', '開催日：' + slash(item.live.date), 'イベント名：' + item.live.title, '未確認：' + item.names.join('、')].join('\n'))) break;
+    for (const item of pending) if (!add([...lineEventLines(item.live), '未確認：' + item.names.join('、')].join('\n'))) break;
     if (included < pending.length) lines.push('', 'ほか' + (pending.length - included) + '件（文字数上限のため省略）');
     return lines.join('\n');
   }
-  for (const l of events) if (!add(['', '開催日：' + slash(l.date), 'イベント名：' + l.title, 'チケットURL：' + (l.purchase_url || '未登録'), '枠数：' + (l.required_throws !== '' ? l.required_throws + '枚' : '未設定')].join('\n'))) break;
+  for (const l of events) if (!add(lineEventLines(l).join('\n'))) break;
   if (included < events.length) lines.push('', 'ほか' + (events.length - included) + '件（文字数上限のため省略）');
   return lines.join('\n');
 }

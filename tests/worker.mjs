@@ -259,6 +259,7 @@ async function lineHook(body, secret = 'line-secret') {
   await __test.sendDeadlineNotifications(env, new Date(today + 'T21:05:00+09:00'));
   const night = JSON.parse(outbound.find(r => r.url.includes('line.me')).init.body).messages[0].text;
   assert.match(night, /未確認：.*Alice/); assert.match(night, /Bob/);
+  assert.match(night, /チケットURL：/); assert.match(night, /枠数：2枚\n未確認：/);
 
   // Web push: per-device groups, one send per day, unregistered tokens disabled.
   const device = { id: crypto.randomUUID(), secret: 'a'.repeat(64), token: 'fcm:token-1' };
