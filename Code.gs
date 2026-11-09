@@ -172,7 +172,8 @@ function readTable_(name,includeRaw=false) {
 }
 function rows_(name) { return readTable_(name).display.slice(1).map(r => Object.fromEntries(TABLES[name].map((k,i)=>[k,r[i]??'']))); }
 function canEditLive_(live,me) {
-  return !!me && me.active==='yes' && (me.role==='admin' || live.owner===me.id);
+  // Every active, authenticated member may edit or delete any event.
+  return !!me && me.active==='yes';
 }
 // A selected name is a convenience label, not authentication.
 // Anyone with the app URL can select any active member.
