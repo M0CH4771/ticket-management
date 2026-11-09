@@ -6,7 +6,7 @@ self.addEventListener('push',event=>{
   const data=payload.data||payload.notification||{};
   event.waitUntil(self.registration.showNotification(data.title||'Ticket Management',{
     body:data.body||'イベントのお知らせがあります。',
-    icon:new URL('icons/icon-192.png',self.registration.scope).href,
+    icon:new URL('icons/icon-192.png?v=4',self.registration.scope).href,
     tag:data.tag||'ticket-management',renotify:false,
     data:{url:self.registration.scope}
   }));

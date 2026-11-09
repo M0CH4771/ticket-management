@@ -1,36 +1,20 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Ticket Management</title>
-<link rel="icon" type="image/png" href="./icons/ticket-management.png?v=3">
-<link rel="apple-touch-icon" sizes="180x180" href="./icons/ticket-management.png?v=3">
+<link rel="icon" type="image/svg+xml" href="./icons/favicon.svg?v=4">
+<link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png?v=4">
+<link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png?v=4">
 <link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16213a" media="(prefers-color-scheme: dark)">
+<script id="theme-init">try{var t=localStorage.getItem('ticket-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;document.querySelectorAll('meta[name=theme-color]').forEach(function(m){m.content=t==='dark'?'#16213a':'#ffffff'})}}catch(e){}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ticket Management">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
-<link rel="stylesheet" href="./styles.css?v=20261109"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-live="polite">
-  <div class="startup-content">
-    <div class="startup-ticket" aria-hidden="true">
-      <svg class="launch-ticket" viewBox="0 0 240 150">
-        <g class="ticket-main">
-          <path d="M28 18h132v114H28c-9 0-16-7-16-16V94c14 0 14-28 0-28V34c0-9 7-16 16-16Z" fill="#fff8e8" stroke="#10284b" stroke-width="7" stroke-linejoin="round"/>
-          <rect x="26" y="34" width="14" height="82" rx="7" fill="#2788f5"/>
-          <path d="m96 41 9 20 22 2-17 15 5 22-19-12-19 12 5-22-17-15 22-2z" fill="#ffc52e" stroke="#10284b" stroke-width="4" stroke-linejoin="round"/>
-          <path d="M64 112h69M69 122h57" stroke="#b8c0ce" stroke-width="5" stroke-linecap="round"/>
-        </g>
-        <g class="ticket-stub">
-          <path d="M160 18h52c9 0 16 7 16 16v32c-14 0-14 28 0 28v22c0 9-7 16-16 16h-52Z" fill="#ff6a58" stroke="#10284b" stroke-width="7" stroke-linejoin="round"/>
-          <g fill="#10284b">
-            <rect x="177" y="43" width="4" height="45" rx="2"/><rect x="185" y="43" width="7" height="45" rx="2"/><rect x="197" y="43" width="4" height="45" rx="2"/><rect x="205" y="43" width="6" height="45" rx="2"/>
-          </g>
-        </g>
-        <path class="tear-seam" d="M160 23v104" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-dasharray="4 8"/>
-      </svg>
-    </div>
-    <strong class="startup-title">Ticket Management</strong>
-    <span class="startup-message">データを読み込んでいます</span>
-    <span class="startup-progress" aria-hidden="true"><i></i></span>
-  </div>
-</div><header><a class="brand" href="./" aria-label="Ticket Management home"><img src="./icons/ticket-management.png?v=3" alt=""><span>Ticket Management</span></a><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
+<link rel="stylesheet" href="./styles.css?v=20261109"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
+  <div class="startup-content"><div class="startup-mark"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#12233f"/><defs><mask id="startup-hole"><rect x="-400" y="-400" width="800" height="800" fill="#fff"/><polygon points="-49.5,-54.0 -35.4,-15.4 5.7,-13.9 -26.7,11.4 -15.4,50.9 -49.5,28.0 -83.6,50.9 -72.3,11.4 -104.7,-13.9 -63.6,-15.4" fill="#000"/></mask></defs><g transform="translate(244 262) scale(1.04) rotate(-12)"><path class="ticket" d="M-145.0,-95.0 H61.0 A22,22 0 0 1 83.0,-73.0 V73.0 A22,22 0 0 1 61.0,95.0 H-145.0 A22,22 0 0 1 -167.0,73.0 V26.0 A26,26 0 0 0 -167.0,-26.0 V-73.0 A22,22 0 0 1 -145.0,-95.0 Z" fill="#ffffff" mask="url(#startup-hole)"/><circle cx="83.0" cy="-77.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="0.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="77.0" r="6.5" fill="#12233f"/><g class="stub-tear"><g class="stub" transform="translate(99.0 8) rotate(11 0 95.0)"><path d="M22,-95.0 H74 A22,22 0 0 1 96,-73.0 V-26.0 A26,26 0 0 0 96,26.0 V73.0 A22,22 0 0 1 74,95.0 H22 A22,22 0 0 1 0,73.0 V-73.0 A22,22 0 0 1 22,-95.0 Z" fill="#ff5b45"/></g></g></g></svg></div><strong class="startup-title">Ticket Management</strong></div>
+</div>
+<script id="startup-once">try{var d=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});if(localStorage.getItem('ticket-startup-day')===d)document.getElementById('startup-screen').remove();else localStorage.setItem('ticket-startup-day',d)}catch(e){}</script>
+<header><a class="brand" href="./" aria-label="Ticket Management ホーム"><img src="./icons/favicon.svg?v=4" alt="" width="40" height="40"><span>Ticket Management</span></a><div id="account"></div></header><div id="notice" role="status" aria-live="polite"></div><main id="app"></main><dialog id="modal" aria-labelledby="modal-title"></dialog>
 <script src="./config.js?v=832f55ba"></script>
 <script src="./transport.js"></script>
 <script>
@@ -57,7 +41,7 @@ function finishStartup(){
   const screen=$('startup-screen');
   if(!screen||screen.classList.contains('closing')||startupCloseTimer)return;
   const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const minimum=reduced?0:300; // only long enough to avoid a flash
+  const minimum=reduced?0:900; // shown once a day; lets the stub-tear finish
   const wait=Math.max(0,minimum-(performance.now()-startupStartedAt));
   startupCloseTimer=setTimeout(()=>{
     if(!screen.isConnected)return;
@@ -191,7 +175,7 @@ function memberMessage(message,isError=false){const el=$('member-message');if(el
 async function chooseMemberScreen(){
   const screenVersion=++refreshVersion;loading=false;cachedView=false;
   data=null;selected='';searchQuery='';groupFilter='';myFilter='すべて';memberId='';$('account').textContent='';
-  $('app').innerHTML='<div class="card login"><img class="login-mark" src="./icons/ticket-management.png?v=3" alt=""><h1>ログイン</h1><p class="muted">メンバー登録済みのGoogleアカウントでログインしてください。</p><p id="member-message" role="status" aria-live="polite">ログインの準備中…</p><div id="member-options"></div></div>';
+  $('app').innerHTML='<div class="card login"><img class="login-mark" src="./icons/favicon.svg?v=4" alt=""><h1>ログイン</h1><p class="muted">メンバー登録済みのGoogleアカウントでログインしてください。</p><p id="member-message" role="status" aria-live="polite">ログインの準備中…</p><div id="member-options"></div></div>';
   const showError=(message,showSignIn=true)=>{
     const host=$('member-options');if(!host)return;
     host.innerHTML=(showSignIn?'<button id="google-sign-in" class="primary">Googleでログイン</button>':'')+'<button id="retry-members">再読込</button>';
@@ -388,9 +372,16 @@ async function lineSettingsForm(){
 }
 function filterCount(){return (groupFilter?1:0)+(applicationFilter?1:0)+(myFilter!=='すべて'?1:0)}
 function updateFilterToggle(){const b=$('toggle-filters');if(!b)return;const n=filterCount();b.innerHTML='絞り込み'+(n?`<span class="filter-count">${n}</span>`:'');b.setAttribute('aria-expanded',String(mobileFiltersOpen))}
+function themeMode(){try{const t=localStorage.getItem('ticket-theme');return t==='light'||t==='dark'?t:'auto'}catch(e){return 'auto'}}
+function applyTheme(mode){
+  try{if(mode==='auto')localStorage.removeItem('ticket-theme');else localStorage.setItem('ticket-theme',mode)}catch(e){}
+  if(mode==='auto')delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=mode;
+  document.querySelectorAll('meta[name=theme-color]').forEach(m=>{m.content=mode==='dark'?'#16213a':mode==='light'?'#ffffff':(m.media.includes('dark')?'#16213a':'#ffffff')});
+  document.querySelectorAll('[data-theme-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.themeMode===mode)));
+}
 function accountMenu(){
   const name=esc(data.me.name),admin=data.me.isAdmin,role=admin?'管理者':'メンバー';
-  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><button type="button" id="logout">ログアウト</button></div></details>`;
+  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><p class="theme-switch-label" id="theme-label">表示</p><div class="theme-switch" role="group" aria-labelledby="theme-label">${[['auto','自動'],['light','ライト'],['dark','ダーク']].map(([v,l])=>`<button type="button" data-theme-mode="${v}" aria-pressed="${themeMode()===v}">${l}</button>`).join('')}</div><button type="button" id="logout">ログアウト</button></div></details>`;
 }
 function renderHome(){if(!data)return;const today=japanDay();lastDay=today;const todayPending=(data.lives||[]).filter(l=>!l.archived&&l.lotteryDeadline===today&&['未確認','未申込'].includes(myApplicationStatus(l))).length;const lives=sortedEvents(data.lives.filter(l=>archiveView?l.archived===true:(l.date>=today&&!l.archived)),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
 $('account').innerHTML=accountMenu();
@@ -414,6 +405,7 @@ $('application-filter').onchange=e=>{applicationFilter=e.target.value;drawTiles(
 $('notification-settings').onclick=()=>{closeAccount();import('./notifications.js').then(m=>m.open(memberId)).catch(()=>notice('通知設定を開けませんでした。再読込してください。'))};
 if($('line-admin-settings'))$('line-admin-settings').onclick=()=>{closeAccount();lineSettingsForm()};
 $('permissions-help').onclick=()=>{closeAccount();permissionInfo()};
+document.querySelectorAll('[data-theme-mode]').forEach(b=>b.onclick=()=>applyTheme(b.dataset.themeMode));
 document.querySelectorAll('[data-my-filter]').forEach(b=>b.onclick=()=>{myFilter=b.dataset.myFilter;document.querySelectorAll('[data-my-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.myFilter===myFilter)));drawTiles(lives,today)});
 $('my-surplus-list').onclick=personalSurplusList;$('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();
 {drawTiles(lives,today);$('clear-filters').onclick=()=>{clearTimeout(searchTimer);searchQuery='';groupFilter='';applicationFilter='';myFilter='すべて';document.querySelectorAll('[data-my-filter]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.myFilter===myFilter));$('search').value='';$('group-filter').value='';$('application-filter').value='';drawTiles(lives,today)};$('group-filter').onchange=e=>{groupFilter=e.target.value;drawTiles(lives,today)};$('search').oninput=e=>{searchQuery=e.target.value;clearTimeout(searchTimer);searchTimer=setTimeout(()=>drawTiles(lives,today),120)};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{viewMode=b.dataset.view;try{localStorage.setItem('ticket-view-mode',viewMode)}catch(e){}render()})}showRefreshState();bindSyncPanel()}
@@ -607,7 +599,7 @@ function addForm(){
 function ticketShareText(liveId,number,url){const live=data.lives.find(l=>l.id===liveId);return ['日付：'+(live?eventDateLabel(live.date):''),'イベント名：'+(live?.title||''),'チケット番号：'+String(number||'').trim(),'URL：'+String(url||'').trim()].join('\n')}
 async function copyTicketShare(liveId,number,url){const text=ticketShareText(liveId,number,url);try{await navigator.clipboard.writeText(text);notice('チケット情報をコピーしました');return true}catch(e){modal('チケット情報をコピー',`<p class="muted">下の内容を選択してコピーしてください。</p><textarea id="ticket-share-copy" readonly rows="5">${esc(text)}</textarea>`,()=>{});$('submit-save').hidden=true;$('ticket-share-copy').focus();$('ticket-share-copy').select()}}
 function ticketForm(t){if(busy||!t||t.memberId!==data.me.id||ticketPending(t))return;managerMode='edit';modal('チケットを編集',field('整理番号','number',t.number)+`<div id="duplicate-warning" class="duplicate-warning" role="status"></div><label for="status">状態</label><select id="status" name="status" required>${ticketStatusOptions(t.status,true)}</select>`+field('譲り先（任意）','recipient',t.recipient)+`<label for="memo">この番号のメモ</label><textarea id="memo" name="memo" maxlength="500" placeholder="例：〇〇さんに譲渡、受け渡し方法など">${esc(t.memo||'')}</textarea>`+field('本人用チケットURL（任意）','ticketUrl',t.ticketUrl,'url')+`<button type="button" id="copy-ticket-details" class="copy-ticket-details">日付・イベント名・番号・URLをコピー</button><p class="muted form-hint">チケットURL・メモ・譲り先は、ほかのメンバーには表示されません。</p><button class="danger" type="button" id="delete" style="width:100%;margin-top:18px">このチケットを削除</button>`,p=>{if(normalizedNumber(p.number)!==normalizedNumber(t.number)&&!duplicateWarning(t.liveId,[p.number],t.id)){notice('登録済み番号を確認してください');return}save('ticket',{...p,id:t.id,liveId:t.liveId,version:t.version})});const updateCopy=()=>{$('copy-ticket-details').disabled=!($('f-number').value.trim()&&$('f-ticketUrl').value.trim())};$('copy-ticket-details').onclick=async()=>{if(await copyTicketShare(t.liveId,$('f-number').value,$('f-ticketUrl').value))$('copy-ticket-details').textContent='コピーしました'};$('f-number').oninput=()=>{duplicateWarning(t.liveId,normalizedNumber($('f-number').value)===normalizedNumber(t.number)?[]:[$('f-number').value],t.id);updateCopy()};$('f-ticketUrl').oninput=updateCopy;updateCopy();$('delete').onclick=()=>{if(confirm('このチケットを削除しますか？'))save('deleteTicket',{id:t.id,liveId:t.liveId,version:t.version})}}
-function showSetup(){ $('account').textContent='';$('app').innerHTML='<div class="card login"><img class="login-mark" src="./icons/ticket-management.png?v=3" alt=""><h1>初期設定を準備中です</h1><p>イベント・チケットの保存先を接続すると利用できます。</p><p class="muted">幹事の方は設定手順に沿ってGASを公開し、そのURLを設定してください。メンバーの方の設定は不要です。</p><a href="https://github.com/M0CH4771/ticket-management#最初の設定" target="_blank" rel="noopener">設定手順を見る ↗</a></div>';finishStartup()}
+function showSetup(){ $('account').textContent='';$('app').innerHTML='<div class="card login"><img class="login-mark" src="./icons/favicon.svg?v=4" alt=""><h1>初期設定を準備中です</h1><p>イベント・チケットの保存先を接続すると利用できます。</p><p class="muted">幹事の方は設定手順に沿ってGASを公開し、そのURLを設定してください。メンバーの方の設定は不要です。</p><a href="https://github.com/M0CH4771/ticket-management#最初の設定" target="_blank" rel="noopener">設定手順を見る ↗</a></div>';finishStartup()}
 window.addEventListener('popstate',handleHistory);
 document.addEventListener('click',e=>{document.querySelectorAll('details.ev-more[open],details.account-menu[open]').forEach(d=>{if(!d.contains(e.target))d.open=false})});
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const open=document.querySelector('details.ev-more[open],details.account-menu[open]');if(open){open.open=false;open.querySelector('summary').focus()}});
