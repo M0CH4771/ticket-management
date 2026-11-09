@@ -10,6 +10,10 @@
 <meta name="apple-mobile-web-app-title" content="Ticket Management">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js">
+<link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js">
 <link rel="stylesheet" href="./styles.css?v=20261109"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
   <div class="startup-content"><div class="startup-mark"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#12233f"/><defs><mask id="startup-hole"><rect x="-400" y="-400" width="800" height="800" fill="#fff"/><polygon points="-49.5,-54.0 -35.4,-15.4 5.7,-13.9 -26.7,11.4 -15.4,50.9 -49.5,28.0 -83.6,50.9 -72.3,11.4 -104.7,-13.9 -63.6,-15.4" fill="#000"/></mask></defs><g transform="translate(244 262) scale(1.04) rotate(-12)"><path class="ticket" d="M-145.0,-95.0 H61.0 A22,22 0 0 1 83.0,-73.0 V73.0 A22,22 0 0 1 61.0,95.0 H-145.0 A22,22 0 0 1 -167.0,73.0 V26.0 A26,26 0 0 0 -167.0,-26.0 V-73.0 A22,22 0 0 1 -145.0,-95.0 Z" fill="#ffffff" mask="url(#startup-hole)"/><circle cx="83.0" cy="-77.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="0.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="77.0" r="6.5" fill="#12233f"/><g class="stub-tear"><g class="stub" transform="translate(99.0 8) rotate(11 0 95.0)"><path d="M22,-95.0 H74 A22,22 0 0 1 96,-73.0 V-26.0 A26,26 0 0 0 96,26.0 V73.0 A22,22 0 0 1 74,95.0 H22 A22,22 0 0 1 0,73.0 V-73.0 A22,22 0 0 1 22,-95.0 Z" fill="#ff5b45"/></g></g></g></svg></div><strong class="startup-title">Ticket Management</strong></div>
 </div>
@@ -68,6 +72,7 @@ async function refresh(){
     if(!$('modal').open){render();openPendingTimetableImport()}else refreshTicketManager();
   }catch(e){
     if(version!==refreshVersion||memberId!==requestedMember)return;
+    if(/登録されたメンバーではありません|未登録です/.test(e.message||'')){rememberMember('');data=null;confirmedData=null;loading=false;chooseMemberScreen();return}
     if(!data){
       $('app').innerHTML='<div class="card login"><h1>読み込めませんでした</h1><p class="muted">通信状態を確認して、もう一度お試しください。</p><div id="member-options"><button id="reload" class="primary">再読込</button><button id="change-member">ログイン画面に戻る</button></div></div>';
       $('reload').onclick=refresh;$('change-member').onclick=chooseMemberScreen;
@@ -170,8 +175,42 @@ async function save(action,p){
   ++refreshVersion;loading=false;rebuildOptimistic();modalDirty=false;$('modal').close();updateSaveView(action);if(managerLiveId)ticketManager(managerLiveId);notice('画面に反映しました。スプシへ保存中…');processOutbox();
 }
 
-function rememberMember(id){if(id!==memberId){++refreshVersion;loading=false;try{sessionStorage.removeItem('ticket-snapshot')}catch(e){}}memberId=id;try{if(id)localStorage.setItem('live-pocket-member',id);else localStorage.removeItem('live-pocket-member')}catch(e){}}
+function rememberMember(id){if(id!==memberId){++refreshVersion;loading=false;try{localStorage.removeItem(snapshotKey);sessionStorage.removeItem('ticket-snapshot')}catch(e){}}memberId=id;try{if(id)localStorage.setItem('live-pocket-member',id);else localStorage.removeItem('live-pocket-member')}catch(e){}}
 function memberMessage(message,isError=false){const el=$('member-message');if(el){el.textContent=message;el.classList.toggle('is-error',isError)}else notice(message)}
+// Firebase web config is public and rarely changes, so it is cached per GAS endpoint.
+// A cached copy lets sign-in start immediately instead of waiting for a GAS round trip.
+let authInit=null;
+function authConfigKey(){return 'ticket-auth-config:'+(window.LIVE_POCKET_CONFIG?.gasUrl||'')}
+function initAuth(){
+  if(authInit)return authInit;
+  authInit=(async()=>{
+    let config=null;try{config=JSON.parse(localStorage.getItem(authConfigKey())||'null')}catch(e){}
+    const fetchConfig=async()=>{const fresh=await rpc('getAuthConfig');if(!fresh?.ready)throw new Error('Firebase Authenticationを設定してください。管理者はREADMEのログイン設定を確認してください');try{localStorage.setItem(authConfigKey(),JSON.stringify(fresh))}catch(e){}return fresh};
+    if(!config?.ready)config=await fetchConfig();
+    const module=await import('./auth.js');
+    try{auth=await module.initialize(config.firebase)}
+    catch(e){try{localStorage.removeItem(authConfigKey())}catch(_){}throw e}
+    return auth;
+  })();
+  authInit.catch(()=>{authInit=null});
+  window.LivePocketAuthReady=authInit;
+  return authInit;
+}
+// Normal launch: show the last list immediately, then load the latest with one GAS call.
+async function startApp(){
+  try{window.LivePocketTransport.warm?.()}catch(e){}
+  const authReady=initAuth();
+  if(memberId&&restoreSnapshot()){confirmedData=data;render()}
+  let signedIn=false,authFailed=false;
+  try{signedIn=Boolean((await authReady).currentUser())}catch(e){authFailed=true}
+  // Offline or Google unreachable: keep the last list on screen and offer a retry.
+  if(authFailed&&data){await refresh();finishStartup();return}
+  if(!memberId||!signedIn){data=null;confirmedData=null;chooseMemberScreen();return}
+  if(restoreOutbox()){if(!data&&restoreSnapshot()){confirmedData=data;render()}await processOutbox()}
+  else await refresh();
+  finishStartup();
+  setTimeout(()=>import('./notifications.js').then(m=>m.resume()).catch(()=>{}),1000);
+}
 async function chooseMemberScreen(){
   const screenVersion=++refreshVersion;loading=false;cachedView=false;
   data=null;selected='';searchQuery='';groupFilter='';myFilter='すべて';memberId='';$('account').textContent='';
@@ -202,18 +241,19 @@ async function chooseMemberScreen(){
     }catch(e){if(screenVersion!==refreshVersion)return;memberMessage(e.message,true);showError(e.message,false);const signOut=document.createElement('button');signOut.textContent='別のGoogleアカウントでログイン';signOut.onclick=async()=>{await auth.signOut();chooseMemberScreen()};$('member-options').append(signOut)}
   };
   try{
-    const config=await rpc('getAuthConfig');
+    await initAuth();
     if(screenVersion!==refreshVersion)return;
-    if(!config?.ready)throw new Error('Firebase Authenticationを設定してください。管理者はREADMEのログイン設定を確認してください');
-    const module=await import('./auth.js');auth=await module.initialize(config.firebase);
     if(auth.currentUser())await finishLogin();
     else{memberMessage('');showError('')}
     finishStartup();
   }catch(e){if(screenVersion!==refreshVersion)return;memberMessage(e.message,true);showError(e.message,false);finishStartup()}
 }
 
-function cacheSnapshot(){try{sessionStorage.setItem('ticket-snapshot',JSON.stringify({endpoint:window.LIVE_POCKET_CONFIG.gasUrl,memberId,data}))}catch(e){}}
-function restoreSnapshot(){try{const saved=JSON.parse(sessionStorage.getItem('ticket-snapshot')||'null');if(saved?.memberId===memberId&&saved.endpoint===window.LIVE_POCKET_CONFIG.gasUrl&&saved.data?.me?.id===memberId&&['lives','members','attendance','tickets'].every(k=>Array.isArray(saved.data[k]))){data=saved.data;cachedView=true;return true}}catch(e){}return false}
+// The last loaded list is kept on this device so the next launch can show it at once
+// while the latest data loads. It is removed on sign-out or when the member changes.
+const snapshotKey='ticket-snapshot-v2';
+function cacheSnapshot(){try{localStorage.setItem(snapshotKey,JSON.stringify({endpoint:window.LIVE_POCKET_CONFIG.gasUrl,memberId,data}))}catch(e){}}
+function restoreSnapshot(){try{const saved=JSON.parse(localStorage.getItem(snapshotKey)||'null');if(saved?.memberId===memberId&&saved.endpoint===window.LIVE_POCKET_CONFIG.gasUrl&&saved.data?.me?.id===memberId&&['lives','members','attendance','tickets'].every(k=>Array.isArray(saved.data[k]))){data=saved.data;cachedView=true;return true}}catch(e){}return false}
 function handleHistory(){if($('modal').open){closeModal()}history.replaceState({ticketView:'home'},'',location.pathname+location.search)}
 
 function attendanceDropdown(l){
@@ -604,5 +644,5 @@ window.addEventListener('popstate',handleHistory);
 document.addEventListener('click',e=>{document.querySelectorAll('details.ev-more[open],details.account-menu[open]').forEach(d=>{if(!d.contains(e.target))d.open=false})});
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const open=document.querySelector('details.ev-more[open],details.account-menu[open]');if(open){open.open=false;open.querySelector('summary').focus()}});
 history.replaceState({ticketView:'home'},'',location.pathname+location.search);
-if(!window.LIVE_POCKET_CONFIG?.gasUrl)showSetup();else chooseMemberScreen();
+if(!window.LIVE_POCKET_CONFIG?.gasUrl)showSetup();else startApp();
 </script></body></html>

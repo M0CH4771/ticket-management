@@ -30,5 +30,11 @@ bridgeListener({origin:'https://evil.example',source:top,data:message});assert.e
 bridgeListener({origin:'https://m0ch4771.github.io',source:top,data:message});assert.equal(calls.length,1);
 bridgeListener({origin:'https://m0ch4771.github.io',source:top,data:message});assert.equal(calls.length,1);
 assert.equal(replies[1].m.ok,true);assert.equal(replies[1].o,'https://m0ch4771.github.io');
+// Calls made while sign-in is still starting wait for it instead of failing.
+{let release;const ready=new Promise(r=>release=r);delete context.window.LivePocketAuth;context.window.LivePocketAuthReady=ready;
+const before=sent.length;const waiting=context.window.LivePocketTransport.call('getData','1');await new Promise(setImmediate);assert.equal(sent.length,before);
+let asked=0;release({getIdToken:async()=>{asked++;return 'late-token'}});for(let i=0;i<5;i++)await new Promise(setImmediate);assert.equal(asked,1);
+context.window.LivePocketAuthReady=undefined;await assert.rejects(context.window.LivePocketTransport.call('getData','1'),/ログイン/);
+assert.equal(typeof context.window.LivePocketTransport.warm,'function');}
 console.log('PASS: iframe handshake, origin/source checks, RPC response, mutation timeout without retry, method allowlist, bridge reply and replay prevention');
 })().catch(e=>{console.error(e);process.exit(1)});

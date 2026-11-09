@@ -32,7 +32,7 @@ const dropdown=c.attendanceDropdown({id:'event'});
 assert.ok(dropdown.includes('1人参戦'));assert.ok(dropdown.includes('不参加'));assert.ok(dropdown.includes('未回答'));assert.ok(dropdown.includes('&lt;友人&gt;'));
 const otherDropdown=c.attendanceDropdown({id:'different'});assert.ok(otherDropdown.includes('0人参戦'));
 c.window={scrollY:240,scrollTo(){}};c.location={pathname:'/app',search:''};
-const storage={};c.sessionStorage={setItem:(k,v)=>storage[k]=v,getItem:k=>storage[k]||null};c.window.LIVE_POCKET_CONFIG={gasUrl:'endpoint'};
+const storage={};c.localStorage={setItem:(k,v)=>storage[k]=v,getItem:k=>storage[k]||null,removeItem:k=>delete storage[k]};c.window.LIVE_POCKET_CONFIG={gasUrl:'endpoint'};
 vm.runInContext("memberId='me';data={me:{id:'me'},lives:[],members:[],tickets:[],attendance:[]};",c);
 c.cacheSnapshot();assert.equal(c.restoreSnapshot(),true);
 vm.runInContext("memberId='other';",c);assert.equal(c.restoreSnapshot(),false);

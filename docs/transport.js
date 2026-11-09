@@ -73,7 +73,9 @@
       pending.set(id, {finish});
       try {
         Promise.resolve().then(async()=>{
-          const callArgs=method==='getAuthConfig'?args:[await window.LivePocketAuth.getIdToken(),...args];
+          const authApi=method==='getAuthConfig'?null:(window.LivePocketAuth||await window.LivePocketAuthReady);
+          if(method!=='getAuthConfig'&&!authApi)throw new Error('Googleアカウントでログインしてください');
+          const callArgs=method==='getAuthConfig'?args:[await authApi.getIdToken(),...args];
           return connect().then(({peer,peerOrigin,channel})=>{
             if(settled)return;
             try{peer.postMessage({type:'live-pocket-call',channel,id,method,args:callArgs},peerOrigin);}
@@ -83,5 +85,7 @@
       } catch (error) {finish(error);resetIdleConnection();}
     });
   }
-  window.LivePocketTransport = {call};
+  // Start the GAS iframe handshake early so it overlaps with sign-in.
+  function warm() {try {connect().catch(() => {});} catch {}}
+  window.LivePocketTransport = {call, warm};
 })();

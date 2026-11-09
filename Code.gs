@@ -276,6 +276,17 @@ function getAuthConfig() {
   const firebase=firebaseAuthConfig_();
   return firebase?{ready:true,firebase}:{ready:false};
 }
+// A verified token maps to the same account until it expires (about 1 hour), so the
+// lookup is cached for the token's remaining lifetime instead of 4 minutes. This
+// removes an extra Google API round trip from almost every request.
+function tokenCacheSeconds_(idToken) {
+  try {
+    const payload=JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(idToken.split('.')[1])).getDataAsString());
+    const remaining=Math.floor(Number(payload.exp)-Date.now()/1000)-60;
+    if(Number.isFinite(remaining)) return Math.max(0,Math.min(remaining,3600));
+  } catch(e) {}
+  return 240;
+}
 function normalizeEmail_(value) {
   const email=String(value||'').trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)?email:'';
@@ -301,7 +312,8 @@ function verifiedEmail_(idToken) {
     if(!account||account.disabled||!account.emailVerified)throw new Error('確認済みのGoogleアカウントでログインしてください');
     email=normalizeEmail_(account.email);
     if(!email)throw new Error('Googleアカウントのメールアドレスを取得できませんでした');
-    cache.put(cacheKey,email,240);
+    const ttl=tokenCacheSeconds_(idToken);
+    if(ttl>0) cache.put(cacheKey,email,ttl);
   }
   return email;
 }
