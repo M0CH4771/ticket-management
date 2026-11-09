@@ -317,7 +317,7 @@ async function copySurplus(l){
     managerLiveId='';managerMode='';modal('余り情報をコピー',`<p class="muted">下の文章を選択してコピーしてください。</p><textarea id="share-text" readonly rows="9">${esc(text)}</textarea>`,()=>{});$('submit-save').hidden=true;$('share-text').focus();$('share-text').select();
   }
 }
-function myApplicationStatus(l){const own=(data.attendance||[]).find(a=>a.liveId===l.id&&a.memberId===data.me.id);return own?.status==='不参加'?'申込不要':own?.applied||'未確認'}
+function myApplicationStatus(l){const own=(data.attendance||[]).find(a=>a.liveId===l.id&&a.memberId===data.me.id);return own?.status==='不参加'?'申込不要':own?.applied==='未申込'?'未確認':own?.applied||'未確認'}
 function stubDate(value){
   const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));
   if(!m)return `<div class="ev-stub"><span class="ev-day">?</span></div>`;
@@ -325,7 +325,7 @@ function stubDate(value){
   return `<time class="ev-stub" datetime="${esc(value)}" aria-label="${+m[2]}月${+m[3]}日(${name})"><span class="ev-month">${+m[2]}月</span><span class="ev-day">${+m[3]}</span><span class="ev-dow ${dow===0?'sun':dow===6?'sat':''}">(${name})</span></time>`;
 }
 function applicationFlag(application,needsApplication){
-  const label={'未確認':'申込未確認','未申込':'未申込','申込済み':'申込済み','申込不要':'申込不要'}[application]||application;
+  const label={'未確認':'申込未確認','申込済み':'申込済み','申込不要':'申込不要'}[application]||application;
   return `<span class="flag ${needsApplication?'todo':application==='申込済み'?'done':''}">${esc(label)}</span>`;
 }
 function eventTile(l,tickets,today){
@@ -334,7 +334,7 @@ function eventTile(l,tickets,today){
   const mine=ownRecord?.status||'未回答';
   const notAttending=mine==='不参加';
   const application=myApplicationStatus(l);
-  const needsApplication=l.lotteryDeadline===today&&(application==='未確認'||application==='未申込');
+  const needsApplication=l.lotteryDeadline===today&&application==='未確認';
   const surplusCount=tickets.filter(t=>t.liveId===l.id&&t.status==='余り').length;
   const fact=(label,value,cls='')=>`<div${cls?` class="${cls}"`:''}><dt>${label}</dt><dd>${value}</dd></div>`;
   const throwsValue=l.requiredThrows!==''&&l.requiredThrows!=null?esc(l.requiredThrows)+'枚':'未設定';
@@ -348,7 +348,7 @@ function eventTile(l,tickets,today){
     l.lotteryDeadline&&(!after||application==='申込済み')?applicationFlag(application,needsApplication):''
   ].join('');
   const id=esc(l.id),title=esc(l.title);
-  const applicationControl=l.lotteryDeadline?`<div><label for="application-${id}">申込状況</label><select id="application-${id}" data-application="${id}" data-value="${esc(application)}" ${notAttending?'disabled':''}>${['未確認','未申込','申込済み','申込不要'].map(v=>`<option value="${v}" ${application===v?'selected':''}>${v}</option>`).join('')}</select>${notAttending?'<span class="application-auto">不参加のため申込不要</span>':''}</div>`:'';
+  const applicationControl=l.lotteryDeadline?`<div><label for="application-${id}">申込状況</label><select id="application-${id}" data-application="${id}" data-value="${esc(application)}" ${notAttending?'disabled':''}>${['未確認','申込済み','申込不要'].map(v=>`<option value="${v}" ${application===v?'selected':''}>${v}</option>`).join('')}</select>${notAttending?'<span class="application-auto">不参加のため申込不要</span>':''}</div>`:'';
   const editable=canEditLive(l);
   const menu=editable&&!archiveView
     ?`<button type="button" class="edit-event" data-edit-live="${id}" aria-label="${title}を編集">イベントを編集</button><button type="button" data-open-memo="${id}">${l.memo?'メモを編集':'メモを追加'}</button><button type="button" class="archive-event" data-archive-live="${id}">アーカイブ</button>`
@@ -474,16 +474,16 @@ function accountMenu(){
   const name=esc(data.me.name),admin=data.me.isAdmin,role=admin?'管理者':'メンバー';
   return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${admin&&usesCloudflare()?'<button type="button" id="member-admin">メンバー管理</button>':''}${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><p class="theme-switch-label" id="theme-label">表示</p><div class="theme-switch" role="group" aria-labelledby="theme-label">${[['auto','自動'],['light','ライト'],['dark','ダーク']].map(([v,l])=>`<button type="button" data-theme-mode="${v}" aria-pressed="${themeMode()===v}">${l}</button>`).join('')}</div><button type="button" id="logout">ログアウト</button></div></details>`;
 }
-function renderHome(){if(!data)return;const today=japanDay();lastDay=today;const todayPending=(data.lives||[]).filter(l=>!l.archived&&l.lotteryDeadline===today&&['未確認','未申込'].includes(myApplicationStatus(l))).length;const lives=sortedEvents(data.lives.filter(l=>archiveView?l.archived===true:(l.date>=today&&!l.archived)),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
+function renderHome(){if(!data)return;const today=japanDay();lastDay=today;const todayPending=(data.lives||[]).filter(l=>!l.archived&&l.lotteryDeadline===today&&myApplicationStatus(l)==='未確認').length;const lives=sortedEvents(data.lives.filter(l=>archiveView?l.archived===true:(l.date>=today&&!l.archived)),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
 $('account').innerHTML=accountMenu();
 const closeAccount=()=>{const m=document.querySelector('.account-menu');if(m)m.open=false};
 $('logout').onclick=async()=>{closeAccount();if(busy)return;if(outbox.length){notice('保存の保留を解決してからログアウトしてください');return}confirmedData=null;rememberMember('');notice('');await auth?.signOut();chooseMemberScreen()};
 const surplusTotal=personalSurplusEvents().reduce((n,x)=>n+x.tickets.length,0);
 $('app').innerHTML=`<div id="sync-host">${syncPanel()}</div>
 <div class="home-head"><h1>${archiveView?'アーカイブ':'イベント一覧'}</h1><div class="actions"><button id="reload">再読込</button><button class="primary" id="new-live">＋ イベント登録</button></div></div>
-${archiveView?`<div class="archive-banner"><span>終了・アーカイブしたイベントを表示しています</span><button type="button" id="archive-exit">開催予定に戻る</button></div>`:todayPending?`<button type="button" id="today-application-alert" class="today-alert" aria-pressed="${applicationFilter==='本日締切未対応'}"><span>本日締切で申込が未対応</span><strong>${todayPending}</strong><span>件</span><span class="today-alert-action">${applicationFilter==='本日締切未対応'?'すべて表示':'絞り込む'}</span></button>`:''}
+${archiveView?`<div class="archive-banner"><span>終了・アーカイブしたイベントを表示しています</span><button type="button" id="archive-exit">開催予定に戻る</button></div>`:todayPending?`<button type="button" id="today-application-alert" class="today-alert" aria-pressed="${applicationFilter==='本日締切未確認'}"><span>本日締切で申込状況が未確認</span><strong>${todayPending}</strong><span>件</span><span class="today-alert-action">${applicationFilter==='本日締切未確認'?'すべて表示':'絞り込む'}</span></button>`:''}
 <div class="filter-bar"><div><label for="search" class="sr-only">イベントを探す</label><input id="search" type="search" class="search" placeholder="イベント・会場・グループ" value="${esc(searchQuery)}"></div><button type="button" id="toggle-filters" class="filter-toggle" aria-expanded="${mobileFiltersOpen}" aria-controls="filter-panel"></button>
-<div class="filter-panel" id="filter-panel"><div class="filter-selects"><div><label for="group-filter">出演グループ</label><select id="group-filter"><option value="">すべてのグループ</option>${groups.map(g=>`<option value="${esc(g)}" ${g===groupFilter?'selected':''}>${esc(g)}</option>`).join('')}</select></div><div><label for="application-filter">申込状況</label><select id="application-filter"><option value="">申込状況：すべて</option><option value="未対応" ${applicationFilter==='未対応'?'selected':''}>未確認・未申込</option><option value="本日締切未対応" ${applicationFilter==='本日締切未対応'?'selected':''}>本日締切で未対応</option><option value="申込済み" ${applicationFilter==='申込済み'?'selected':''}>申込済み</option><option value="申込不要" ${applicationFilter==='申込不要'?'selected':''}>申込不要</option></select></div></div><div class="my-filters" role="group" aria-label="自分の状況で絞り込み">${['すべて','参戦予定','未回答','自分の余りあり'].map(f=>`<button type="button" data-my-filter="${f}" aria-pressed="${myFilter===f}">${f}</button>`).join('')}</div></div></div>
+<div class="filter-panel" id="filter-panel"><div class="filter-selects"><div><label for="group-filter">出演グループ</label><select id="group-filter"><option value="">すべてのグループ</option>${groups.map(g=>`<option value="${esc(g)}" ${g===groupFilter?'selected':''}>${esc(g)}</option>`).join('')}</select></div><div><label for="application-filter">申込状況</label><select id="application-filter"><option value="">申込状況：すべて</option><option value="未確認" ${applicationFilter==='未確認'?'selected':''}>未確認</option><option value="本日締切未確認" ${applicationFilter==='本日締切未確認'?'selected':''}>本日締切で未確認</option><option value="申込済み" ${applicationFilter==='申込済み'?'selected':''}>申込済み</option><option value="申込不要" ${applicationFilter==='申込不要'?'selected':''}>申込不要</option></select></div></div><div class="my-filters" role="group" aria-label="自分の状況で絞り込み">${['すべて','参戦予定','未回答','自分の余りあり'].map(f=>`<button type="button" data-my-filter="${f}" aria-pressed="${myFilter===f}">${f}</button>`).join('')}</div></div></div>
 <div class="results-toolbar"><div class="results-info"><span id="event-count" role="status" aria-live="polite"></span><button type="button" id="my-surplus-list" class="my-surplus-list" aria-label="自分の余り一覧（開催予定の全イベント）">自分の余り ${surplusTotal}枚</button><button type="button" id="clear-filters" hidden>絞り込み解除</button></div><div class="results-tools"><div class="view-switch" role="group" aria-label="表示方法"><button type="button" data-view="list" aria-pressed="${viewMode==='list'}">リスト</button><button type="button" data-view="calendar" aria-pressed="${viewMode==='calendar'}">カレンダー</button></div></div></div>
 <div class="event-grid event-list" id="lives"></div><p id="empty-events" class="empty" hidden></p>
 <p class="foot">最終読込 ${cachedView?'前回の表示（未更新） / ':''}${new Date(data.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}${archiveView?'':' · <button type="button" id="archive-toggle" class="archive-toggle" aria-pressed="false">アーカイブを見る</button>'}</p>`;
@@ -491,7 +491,7 @@ $('app').classList.toggle('filters-expanded',mobileFiltersOpen);updateFilterTogg
 $('toggle-filters').onclick=()=>{mobileFiltersOpen=!mobileFiltersOpen;$('app').classList.toggle('filters-expanded',mobileFiltersOpen);updateFilterToggle()};
 const toggleArchive=()=>{archiveView=!archiveView;applicationFilter='';render();window.scrollTo({top:0,behavior:'instant'})};
 if($('archive-toggle'))$('archive-toggle').onclick=toggleArchive;if($('archive-exit'))$('archive-exit').onclick=toggleArchive;
-if($('today-application-alert'))$('today-application-alert').onclick=()=>{archiveView=false;applicationFilter=applicationFilter==='本日締切未対応'?'':'本日締切未対応';render()};
+if($('today-application-alert'))$('today-application-alert').onclick=()=>{archiveView=false;applicationFilter=applicationFilter==='本日締切未確認'?'':'本日締切未確認';render()};
 $('application-filter').onchange=e=>{applicationFilter=e.target.value;drawTiles(lives,today)};
 $('notification-settings').onclick=()=>{closeAccount();import('./notifications.js').then(m=>m.open(memberId)).catch(()=>notice('通知設定を開けませんでした。再読込してください。'))};
 if($('line-admin-settings'))$('line-admin-settings').onclick=()=>{closeAccount();lineSettingsForm()};
@@ -503,7 +503,7 @@ $('my-surplus-list').onclick=personalSurplusList;$('reload').onclick=refresh;$('
 {drawTiles(lives,today);$('clear-filters').onclick=()=>{clearTimeout(searchTimer);searchQuery='';groupFilter='';applicationFilter='';myFilter='すべて';document.querySelectorAll('[data-my-filter]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.myFilter===myFilter));$('search').value='';$('group-filter').value='';$('application-filter').value='';drawTiles(lives,today)};$('group-filter').onchange=e=>{groupFilter=e.target.value;drawTiles(lives,today)};$('search').oninput=e=>{searchQuery=e.target.value;clearTimeout(searchTimer);searchTimer=setTimeout(()=>drawTiles(lives,today),120)};document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{viewMode=b.dataset.view;try{localStorage.setItem('ticket-view-mode',viewMode)}catch(e){}render()})}showRefreshState();bindSyncPanel()}
 function drawTiles(lives,today){
   const q=searchQuery.trim().normalize('NFKC').toLowerCase();
-  const visible=lives.filter(l=>matchesMyFilter(l)&&(!applicationFilter||(applicationFilter==='本日締切未対応'?l.lotteryDeadline===today&&['未確認','未申込'].includes(myApplicationStatus(l)):applicationFilter==='未対応'?['未確認','未申込'].includes(myApplicationStatus(l)):myApplicationStatus(l)===applicationFilter))&&(!groupFilter||(l.groups||[]).includes(groupFilter))&&(l.title+' '+l.venue+' '+(l.groups||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q));
+  const visible=lives.filter(l=>matchesMyFilter(l)&&(!applicationFilter||(applicationFilter==='本日締切未確認'?l.lotteryDeadline===today&&myApplicationStatus(l)==='未確認':applicationFilter==='未確認'?myApplicationStatus(l)==='未確認':myApplicationStatus(l)===applicationFilter))&&(!groupFilter||(l.groups||[]).includes(groupFilter))&&(l.title+' '+l.venue+' '+(l.groups||[]).join(' ')).normalize('NFKC').toLowerCase().includes(q));
   if($('event-count'))$('event-count').textContent=(q||groupFilter||myFilter!=='すべて'||applicationFilter?visible.length+'件 / 全'+lives.length+'件':visible.length+'件');
   if($('clear-filters'))$('clear-filters').hidden=!(q||groupFilter||myFilter!=='すべて'||applicationFilter);
   updateFilterToggle();
