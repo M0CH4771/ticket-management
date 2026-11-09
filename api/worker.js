@@ -103,7 +103,7 @@ const ticketKey = number => String(number || '').normalize('NFKC').trim().toUppe
 /* ---------- row <-> API shapes (same keys the old GAS API returned) ---------- */
 const liveOut = r => ({ id: r.id, title: r.title, date: r.date, venue: r.venue, sheetUrl: r.sheet_url, memo: r.memo, owner: r.owner, version: String(r.version),
   lotteryDeadline: r.lottery_deadline, requiredThrows: r.required_throws, purchaseUrl: r.purchase_url, groups: readGroups(r.groups), archived: !!r.archived });
-const attendanceOut = r => ({ id: r.id, liveId: r.event_id, memberId: r.member_id, status: r.status, version: String(r.version), applied: r.status === '不参加' ? '申込不要' : r.applied });
+const attendanceOut = r => ({ id: r.id, liveId: r.event_id, memberId: r.member_id, status: r.status, version: String(r.version), applied: r.status === '不参加' ? '申込不要' : r.applied === '未申込' ? '' : r.applied });
 const ticketOut = r => ({ id: r.id, liveId: r.event_id, memberId: r.member_id, number: r.number, status: r.status, recipient: r.recipient, memo: r.memo, version: String(r.version), ticketUrl: r.ticket_url });
 // Personal ticket URLs, memos and recipients are visible only to the ticket owner.
 const publicTicket = (t, me) => t.memberId === me.id ? t : { ...t, ticketUrl: '', memo: '', recipient: '' };
@@ -301,7 +301,7 @@ async function saveData(ctx, memberId, action, payload, options) {
         status = oneOf(p.status, ['参戦', '未定', '不参加']);
         applied = status === '不参加' ? '申込不要' : old?.status === '不参加' ? '' : old?.applied || '';
       } else {
-        const selected = oneOf(p.applied, ['申込済み', '申込不要', '未確認', '未申込']);
+        const selected = oneOf(p.applied, ['申込済み', '申込不要', '未確認']);
         applied = old?.status === '不参加' ? '申込不要' : selected === '未確認' ? '' : selected;
       }
       const row = { id: old ? old.id : uuid(), event_id: live.id, member_id: me.id, status, applied, version: old ? old.version + 1 : 1 };
@@ -444,7 +444,7 @@ async function importData({ db, me, env }, data, options) {
   // Every row moves as it is, including rows of events deleted earlier (the app keeps those too).
   const attendance = list(data.attendance).filter(a => a.id && a.liveId && a.memberId).map(a => ({
     id: String(a.id), event_id: String(a.liveId), member_id: String(a.memberId), status: ['参戦', '未定', '不参加'].includes(a.status) ? a.status : '',
-    applied: ['申込済み', '申込不要', '未申込'].includes(a.applied) ? a.applied : '', version: Math.max(1, Number(a.version) || 1),
+    applied: ['申込済み', '申込不要'].includes(a.applied) ? a.applied : '', version: Math.max(1, Number(a.version) || 1),
   })).filter(a => { const k = a.event_id + '|' + a.member_id; if (attendanceSeen.has(k)) return false; attendanceSeen.add(k); return true; });
   const numberSeen = new Set();
   const tickets = list(data.tickets).filter(t => t.id && t.liveId && t.memberId && TICKET_STATUSES.includes(t.status)).map(t => {
