@@ -13,7 +13,9 @@ const data = { ok: true, today, member: { name: 'テスト' }, groups: ['A', 'B'
   ev('1', '今日締切ライブ', day(20), today, { status: '参戦', own: 2 }),
   ev('2', '申込済みライブ', day(8), day(3), { status: '参戦', applied: '申込済み' }),
   ev('3', 'Bのライブ', day(5), day(1), { groups: ['B'], status: '不参加', applied: '申込不要' }),
-  ev('4', '締切なしライブ', day(2), '', { status: '参戦' }),
+  ev('4', '締切なしライブ', day(2), '', { status: '参戦', own: 3, ownNumbers: ['A012', 'A013'], surplus: 2 }),
+  ev('5', '推しの未回答ライブ', day(1), '', { groups: ['C'] }),
+  ev('6', '推しの不参加ライブ', day(1), '', { groups: ['C'], status: '不参加', applied: '申込不要' }),
 ] };
 let api = { status: 200, body: data }, offline = false;
 async function render(type, family, groups = [], files = new Map()) {
@@ -36,9 +38,16 @@ not(await render('deadlines', 'large'), '締切なしライブ');
 has(await render('countdown', 'accessoryRectangular'), '締切 今日', '今日締切ライブ', '申込状況：未確認');
 has(await render('countdown', 'accessoryInline'), '締切今日');
 has(await render('countdown', 'accessoryCircular'), '締切', '今日');
-has(await render('next', 'small'), '次の参戦', 'あと2日', '締切なしライブ');
-has(await render('next', 'medium'), 'その次', '申込済みライブ', '今日締切ライブ');
-has(await render('next', 'accessoryRectangular'), '参戦 あと2日');
+// 次のイベント: 参戦 only, unless 推し groups are chosen — then that group's events show whatever the plan is.
+{
+  const plain = await render('next', 'small');
+  has(plain, '次のイベント', 'あと2日', '締切なしライブ', '参戦', '余り 2枚', '自分用 A012・A013 ほか1枚'); not(plain, '推しの未回答ライブ');
+  has(await render('next', 'accessoryRectangular'), '自分用 A012・A013 ほか1枚 ・ 余り2枚');
+  const oshi = await render('next', 'medium', ['C']);
+  has(oshi, '明日', '推しの不参加ライブ', '推しの未回答ライブ', '不参加', '未回答', 'その次', '締切なしライブ');
+  has(await render('next', 'accessoryRectangular', ['C']), '明日', '不参加');
+  has(await render('next', 'accessoryRectangular'), 'あと2日');
+}
 {
   const a = await render('oshi', 'large', ['A']);
   has(a, 'A', '推しの予定', '月', '今日締切ライブ', '締切', 'ライブ'); not(a, 'Bのライブ');
@@ -52,7 +61,7 @@ api = { status: 200, body: { ...data, events: [ev('9', '先のライブ', day(9)
 has(await render('today', 'small'), '今日締切のイベントはありません', '先のライブ');
 api = { status: 200, body: { ...data, events: [] } };
 has(await render('deadlines', 'medium'), 'これからの締切はありません');
-has(await render('next', 'small'), '参戦予定のイベントはありません');
+has(await render('next', 'small'), 'これからのイベントはありません');
 has(await render('countdown', 'accessoryRectangular'), '締切の予定なし');
 // bad key, offline with and without the last good data
 api = { status: 401, body: { ok: false, error: 'ウィジェットのキーが無効です' } };

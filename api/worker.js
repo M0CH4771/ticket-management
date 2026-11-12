@@ -692,8 +692,8 @@ async function lineWebhook(request, env) {
 }
 
 /* ---------- iPhone widgets (Scriptable) ---------- */
-// Each member gets one read-only key. It only returns that member's own schedule and statuses:
-// no ticket numbers, ticket URLs, memos, or other members' data.
+// Each member gets one read-only key. It only returns that member's own schedule and statuses, plus the
+// numbers of their own 自分用 tickets: no other ticket numbers, ticket URLs, memos, or other members' data.
 const WIDGET_KEY = /^wk_[A-Za-z0-9_-]{43}$/;
 async function getWidgetKey({ db, me }, memberId, reset) {
   sameMember(me, memberId);
@@ -721,7 +721,7 @@ async function widgetData(request, env, now = new Date()) {
     const [events, attendance, tickets] = await Promise.all([
       all(db, 'SELECT id, title, date, venue, lottery_deadline, required_throws, groups FROM events WHERE archived = 0 AND (date >= ? OR lottery_deadline >= ?) ORDER BY date, title', today, today),
       all(db, 'SELECT event_id, status, applied FROM attendance WHERE member_id = ?', member.id),
-      all(db, 'SELECT event_id, status FROM tickets WHERE member_id = ?', member.id),
+      all(db, 'SELECT event_id, status, number FROM tickets WHERE member_id = ? ORDER BY number_key', member.id),
     ]);
     const mine = new Map(attendance.map(a => [a.event_id, a]));
     const count = (eventId, status) => tickets.filter(t => t.event_id === eventId && t.status === status).length;
@@ -730,7 +730,8 @@ async function widgetData(request, env, now = new Date()) {
       const status = a?.status || '';
       const applied = status === '不参加' ? '申込不要' : a?.applied && a.applied !== '未申込' ? a.applied : '未確認';
       return { id: e.id, title: e.title, date: e.date, venue: e.venue, deadline: e.lottery_deadline, throws: e.required_throws, groups: readGroups(e.groups),
-        status, applied, own: count(e.id, '自分用'), surplus: count(e.id, '余り') };
+        status, applied, own: count(e.id, '自分用'), surplus: count(e.id, '余り'),
+        ownNumbers: tickets.filter(t => t.event_id === e.id && t.status === '自分用' && t.number).map(t => t.number) };
     });
     return json({ ok: true, today, member: { name: member.name }, events: out,
       groups: [...new Set(out.flatMap(e => e.groups))].sort((a, b) => a.localeCompare(b, 'ja')), updatedAt: now.toISOString() }, 200, headers);

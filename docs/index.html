@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js">
-<link rel="stylesheet" href="./styles.css?v=20261112"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
+<link rel="stylesheet" href="./styles.css?v=20261112b"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
   <div class="startup-content"><div class="startup-mark"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#12233f"/><defs><mask id="startup-hole"><rect x="-400" y="-400" width="800" height="800" fill="#fff"/><polygon points="-49.5,-54.0 -35.4,-15.4 5.7,-13.9 -26.7,11.4 -15.4,50.9 -49.5,28.0 -83.6,50.9 -72.3,11.4 -104.7,-13.9 -63.6,-15.4" fill="#000"/></mask></defs><g transform="translate(244 262) scale(1.04) rotate(-12)"><path class="ticket" d="M-145.0,-95.0 H61.0 A22,22 0 0 1 83.0,-73.0 V73.0 A22,22 0 0 1 61.0,95.0 H-145.0 A22,22 0 0 1 -167.0,73.0 V26.0 A26,26 0 0 0 -167.0,-26.0 V-73.0 A22,22 0 0 1 -145.0,-95.0 Z" fill="#ffffff" mask="url(#startup-hole)"/><circle cx="83.0" cy="-77.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="0.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="77.0" r="6.5" fill="#12233f"/><g class="stub-tear"><g class="stub" transform="translate(99.0 8) rotate(11 0 95.0)"><path d="M22,-95.0 H74 A22,22 0 0 1 96,-73.0 V-26.0 A26,26 0 0 0 96,26.0 V73.0 A22,22 0 0 1 74,95.0 H22 A22,22 0 0 1 0,73.0 V-73.0 A22,22 0 0 1 22,-95.0 Z" fill="#ff5b45"/></g></g></g></svg></div><strong class="startup-title">Ticket Management</strong></div>
 </div>
 <script id="startup-once">try{var d=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});if(localStorage.getItem('ticket-startup-day')===d)document.getElementById('startup-screen').remove();else localStorage.setItem('ticket-startup-day',d)}catch(e){}</script>
@@ -399,11 +399,11 @@ const WIDGET_TYPES=[
   {type:'today',name:'今日の締切',size:'小・中',desc:'今日が抽選締切のイベントと、自分の申込状況。締切がない日は次の締切を表示します。'},
   {type:'deadlines',name:'締切が近い順',size:'中・大（小も可）',desc:'これからの抽選締切を近い順に。あと何日・枠数・自分の申込状況が分かります。'},
   {type:'countdown',name:'次の締切カウントダウン',size:'ロック画面（小も可）',desc:'「締切 あと2日」をロック画面に。申込状況が未確認の締切を優先して表示します。'},
-  {type:'next',name:'次の参戦',size:'小・中',desc:'参戦予定を「参戦」にしたイベントのうち、いちばん近いもの。あと何日・会場・自分用の枚数。'},
-  {type:'oshi',name:'推しの予定',size:'大（中・小は一覧）',desc:'選んだグループのライブ日と抽選締切をカレンダーで表示します。'},
+  {type:'next',name:'次のイベント',size:'小・中',desc:'いちばん近いイベントまであと何日か。参戦予定を「参戦」にしたイベントと、推しグループのイベント（参戦予定に関係なく）が対象です。会場・参戦予定・自分用の番号・余り枚数も表示します。',groups:true},
+  {type:'oshi',name:'推しの予定',size:'大（中・小は一覧）',desc:'推しグループのライブ日と抽選締切をカレンダーで表示します。推しグループを選ばないと、すべてのグループが対象です。',groups:true},
 ];
 function widgetScript(type,key,groups){
-  const cfg={type,key,api:String(window.LIVE_POCKET_CONFIG.apiUrl).replace(/\/+$/,''),app:new URL('./',location.href).href,groups:type==='oshi'?groups:[]};
+  const cfg={type,key,api:String(window.LIVE_POCKET_CONFIG.apiUrl).replace(/\/+$/,''),app:new URL('./',location.href).href,groups:WIDGET_TYPES.find(t=>t.type===type)?.groups?groups:[]};
   const core=new URL('./widget/core.js',location.href).href;
   const name=WIDGET_TYPES.find(t=>t.type===type)?.name||type;
   return `// チケマネ ウィジェット：${name}
@@ -421,10 +421,12 @@ async function widgetSettings(){
   managerLiveId='';managerMode='';
   const groups=[...new Set((data?.lives||[]).filter(l=>!l.archived).flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));
   let chosen=[];try{chosen=JSON.parse(localStorage.getItem('ticket-widget-groups')||'[]').filter(g=>groups.includes(g))}catch(e){}
-  const card=t=>`<li class="widget-type"><div class="widget-type-head"><strong>${t.name}</strong><span class="widget-size">${t.size}</span></div><p>${t.desc}</p>${t.type==='oshi'?`<fieldset class="widget-groups"><legend>表示するグループ（選ばないとすべて）</legend>${groups.length?groups.map(g=>`<label><input type="checkbox" name="widget-group" value="${esc(g)}" ${chosen.includes(g)?'checked':''}> ${esc(g)}</label>`).join(''):'<span class="muted">グループが登録されたイベントがまだありません</span>'}</fieldset>`:''}<button type="button" class="primary" data-widget-copy="${t.type}" disabled>スクリプトをコピー</button></li>`;
+  const card=t=>`<li class="widget-type"><div class="widget-type-head"><strong>${t.name}</strong><span class="widget-size">${t.size}</span></div><p>${t.desc}</p>${t.groups?'<p class="widget-uses-groups">↑ 上で選んだ推しグループを使います</p>':''}<button type="button" class="primary" data-widget-copy="${t.type}" disabled>スクリプトをコピー</button></li>`;
+  const groupPicker=`<fieldset class="widget-groups"><legend>推しグループ（「次のイベント」「推しの予定」で使います）</legend>${groups.length?groups.map(g=>`<label><input type="checkbox" name="widget-group" value="${esc(g)}" ${chosen.includes(g)?'checked':''}> ${esc(g)}</label>`).join(''):'<span class="muted">グループが登録されたイベントがまだありません</span>'}</fieldset><p class="muted widget-groups-note">変えたときは、その種類をもう一度コピーして貼り直してください。</p>`;
   modal('iPhoneウィジェット',`<p>無料アプリ「Scriptable」を使って、締切や参戦予定をホーム画面・ロック画面に表示できます（iPhoneのみ）。</p>
   <ol class="admin-steps"><li>App Storeで<a href="https://apps.apple.com/jp/app/scriptable/id1405459188" target="_blank" rel="noopener">Scriptable</a>を入れます。</li><li>下で使いたい種類の<b>スクリプトをコピー</b>を押します。</li><li>Scriptableを開いて右上の<b>＋</b>を押し、貼り付けます。いちばん上の名前を「チケマネ 締切」などに変えて<b>完了（Done）</b>。</li><li>ホーム画面を長押し →<b>編集</b>→<b>ウィジェットを追加</b>→<b>Scriptable</b>を選び、サイズを決めて追加します。ロック画面は、ロック画面を長押し →<b>カスタマイズ</b>→<b>ロック画面</b>→ウィジェット欄から<b>Scriptable</b>を追加します。</li><li>置いたウィジェットを長押し（ロック画面はタップ）→<b>ウィジェットを編集</b>→<b>Script</b>で3のスクリプトを選びます。</li></ol>
   <p id="widget-status" class="muted" role="status">準備しています…</p>
+  ${groupPicker}
   <ul class="widget-types">${WIDGET_TYPES.map(card).join('')}</ul>
   <details class="widget-reset"><summary>キーを作り直す</summary><p class="muted">スクリプトを人に送ってしまったときに使います。作り直すと、今あるウィジェットはすべて表示されなくなるので、もう一度コピーして貼り直してください。</p><button type="button" id="widget-reset" class="danger">キーを作り直す</button></details>`,()=>{});
   $('submit-save').hidden=true;

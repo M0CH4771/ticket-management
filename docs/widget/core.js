@@ -16,7 +16,7 @@ const T = {
   green: C('#1c7445', '#7dd6a3'), greenTint: C('#e5f3eb', '#15362a'),
   sunInk: C('#7a5600', '#ffd56a'), sunTint: C('#fff5d6', '#352c12'),
 };
-const TYPE_NAMES = { today: '今日の締切', deadlines: '締切が近い順', countdown: '次の締切', next: '次の参戦', oshi: '推しの予定' };
+const TYPE_NAMES = { today: '今日の締切', deadlines: '締切が近い順', countdown: '次の締切', next: '次のイベント', oshi: '推しの予定' };
 
 /* ---------- dates (always Japan time) ---------- */
 const japanToday = () => new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
@@ -102,14 +102,31 @@ const rowsFor = (family, small, medium, large) => (family === 'small' ? small : 
 /* ---------- selections ---------- */
 const upcomingDeadlines = (events, today) => events.filter(e => isDate(e.deadline) && e.deadline >= today)
   .sort((a, b) => a.deadline.localeCompare(b.deadline) || a.date.localeCompare(b.date));
-const nextAttending = (events, today) => events.filter(e => e.status === '参戦' && isDate(e.date) && e.date >= today)
-  .sort((a, b) => a.date.localeCompare(b.date));
+// 次のイベント: events the member marked 参戦, plus every event of the chosen 推し groups (whatever the plan is).
+const wantedGroups = () => (CONFIG.groups || []).filter(Boolean);
+const nextEvents = (events, today) => {
+  const wanted = wantedGroups();
+  return events.filter(e => isDate(e.date) && e.date >= today && (e.status === '参戦' || (e.groups || []).some(g => wanted.includes(g))))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
+};
+// 自分用 numbers (falls back to the count for tickets without a number yet)
+function ownText(e) {
+  const nums = e.ownNumbers || [];
+  if (!e.own) return '';
+  return '自分用 ' + (nums.length ? nums.join('・') + (e.own > nums.length ? ' ほか' + (e.own - nums.length) + '枚' : '') : e.own + '枚');
+}
+const PLAN = { '参戦': ['参戦', 'blue', 'blueTint'], '未定': ['未定', 'sunInk', 'sunTint'], '不参加': ['不参加', 'ink3', 'soft'] };
+const planLabel = e => (PLAN[e.status] || ['未回答'])[0];
+function planChip(parent, e) {
+  const [label, fg, bg] = PLAN[e.status] || ['未回答', 'coralInk', 'coralTint'];
+  return chip(parent, label, T[fg], T[bg]);
+}
 function countdownTarget(events, today) {
   const list = upcomingDeadlines(events, today);
   return list.find(e => e.applied === '未確認') || list[0] || null;
 }
 function oshiItems(data, today) {
-  const wanted = (CONFIG.groups || []).filter(Boolean);
+  const wanted = wantedGroups();
   const events = data.events.filter(e => !wanted.length || (e.groups || []).some(g => wanted.includes(g)));
   const items = [];
   for (const e of events) {
@@ -214,41 +231,53 @@ function countdownWidget(w, family, data, today) {
   appliedChip(foot, e);
 }
 
-/* ---------- widget: 次の参戦 ---------- */
+/* ---------- widget: 次のイベント ---------- */
 function nextWidget(w, family, data, today) {
-  const list = nextAttending(data.events, today);
+  const list = nextEvents(data.events, today);
   const e = list[0], n = e ? daysUntil(e.date, today) : null;
-  if (family === 'accessoryInline') { text(w, e ? '参戦' + until(n) + ' ' + e.title : '参戦予定なし', 12, null, '', 1); return; }
+  const none = wantedGroups().length ? 'これからのイベントなし' : '参戦予定なし';
+  if (family === 'accessoryInline') { text(w, e ? 'イベント' + until(n) + ' ' + e.title : none, 12, null, '', 1); return; }
   if (family === 'accessoryCircular') {
     w.addAccessoryWidgetBackground = true;
     w.addSpacer();
     const s = w.addStack(); s.layoutVertically(); s.centerAlignContent();
-    const a = text(s, '参戦', 10, null, 'semibold', 1); a.centerAlignText();
+    const a = text(s, '次', 10, null, 'semibold', 1); a.centerAlignText();
     const b = text(s, e ? (n <= 0 ? '今日' : n === 1 ? '明日' : String(n)) : '-', e && n > 1 ? 22 : 15, null, 'round', 1); b.centerAlignText(); b.minimumScaleFactor = 0.6;
     if (e && n > 1) { const c = text(s, '日', 9, null, '', 1); c.centerAlignText(); }
     w.addSpacer();
     return;
   }
   if (family === 'accessoryRectangular') {
-    if (!e) { ltext(w, '参戦予定なし', 13, null, 'semibold', 1); return; }
-    ltext(w, '参戦 ' + until(n) + '（' + mdw(e.date) + '）', 13, null, 'bold', 1);
+    if (!e) { ltext(w, none, 13, null, 'semibold', 1); return; }
+    ltext(w, until(n) + '（' + mdw(e.date) + '）' + (e.status === '参戦' ? '' : ' ' + planLabel(e)), 13, null, 'bold', 1);
     ltext(w, e.title, 12, null, '', 1);
-    ltext(w, e.venue || ' ', 11, null, '', 1);
+    const extra = [ownText(e), e.surplus > 0 ? '余り' + e.surplus + '枚' : ''].filter(Boolean).join(' ・ ');
+    ltext(w, extra || e.venue || ' ', 11, null, '', 1);
     return;
   }
-  if (!e) { header(w, '次の参戦', T.blue, ''); w.addSpacer(6); message(w, '参戦予定のイベントはありません', 'チケマネで参戦予定を「参戦」にすると表示されます'); w.addSpacer(); return; }
+  if (!e) {
+    header(w, '次のイベント', T.blue, ''); w.addSpacer(6);
+    message(w, 'これからのイベントはありません', wantedGroups().length ? '推しグループのイベントと、参戦予定を「参戦」にしたイベントが表示されます' : 'チケマネで参戦予定を「参戦」にするか、推しグループを選ぶと表示されます');
+    w.addSpacer(); return;
+  }
   const main = family === 'small' ? w : w.addStack();
   if (family !== 'small') { main.layoutHorizontally(); main.topAlignContent(); }
   const card = family === 'small' ? w : main.addStack();
   if (family !== 'small') { card.layoutVertically(); card.size = new Size(138, 0); }
-  header(card, '次の参戦', T.blue, '');
+  header(card, '次のイベント', T.blue, '');
   card.addSpacer(4);
-  ltext(card, until(n), family === 'small' ? 26 : 30, n <= 0 ? T.coral : T.ink, 'round', 1);
+  ltext(card, until(n), 24, n <= 0 ? T.coral : T.ink, 'round', 1);
   card.addSpacer(2);
   ltext(card, e.title, 13, T.ink, 'semibold', 2);
   card.addSpacer(3);
   ltext(card, mdw(e.date) + (e.venue ? ' ・ ' + e.venue : ''), 10, T.ink3, '', 1);
-  if (e.own > 0) { card.addSpacer(4); const r = card.addStack(); chip(r, '自分用 ' + e.own + '枚', T.blue, T.blueTint); r.addSpacer(); }
+  card.addSpacer(4);
+  const chips = card.addStack(); chips.layoutHorizontally(); chips.centerAlignContent();
+  planChip(chips, e);
+  if (e.surplus > 0) { chips.addSpacer(4); chip(chips, '余り ' + e.surplus + '枚', T.sunInk, T.sunTint); }
+  chips.addSpacer();
+  const mine = ownText(e);
+  if (mine) { card.addSpacer(3); ltext(card, mine, 11, T.blue, 'semibold', 1); }
   if (family === 'small') { w.addSpacer(); return; }
   card.addSpacer();
   main.addSpacer(10);
@@ -258,8 +287,10 @@ function nextWidget(w, family, data, today) {
   const rest = list.slice(1, family === 'large' ? 9 : 4);
   if (!rest.length) text(side, '予定なし', 11, T.ink3, '', 1);
   for (const x of rest) {
-    text(side, mdw(x.date) + ' ' + until(daysUntil(x.date, today)), 10, T.ink3, '', 1);
+    text(side, mdw(x.date) + ' ' + until(daysUntil(x.date, today)) + ' ・ ' + planLabel(x), 10, T.ink3, '', 1);
     text(side, x.title, 12, T.ink, 'semibold', 1);
+    const sub = [ownText(x), x.surplus > 0 ? '余り' + x.surplus + '枚' : ''].filter(Boolean).join(' ・ ');
+    if (sub && family === 'large') text(side, sub, 10, T.blue, '', 1);
     side.addSpacer(5);
   }
   side.addSpacer();

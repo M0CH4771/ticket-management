@@ -195,8 +195,9 @@ console.log('PASS: events with groups/validation/version conflicts (incl. simult
   const ev = body.events.find(e => e.id === live.id);
   assert.deepEqual({ date: ev.date, deadline: ev.deadline, throws: ev.throws, status: ev.status, applied: ev.applied, own: ev.own, surplus: ev.surplus },
     { date: later, deadline: tomorrow, throws: '3', status: '不参加', applied: '申込不要', own: 1, surplus: 0 });
+  assert.deepEqual(ev.ownNumbers, ['A35'], 'own 自分用 numbers only');
   const raw = JSON.stringify(body);
-  for (const secret of ['A12', 'A35', 'example.com/mine', '連絡済み', '友人', 'alice@example.com', 'Bob', 'sheet']) assert.ok(!raw.includes(secret), 'widget leaks ' + secret);
+  for (const secret of ['A12', 'example.com/mine', '連絡済み', '友人', 'alice@example.com', 'Bob', 'sheet']) assert.ok(!raw.includes(secret), 'widget leaks ' + secret);
   // Bob has no attendance row: 未確認. His own 50 unissued tickets are not counted as 自分用/余り.
   const bobEv = (await (await widget(bobKey)).json()).events.find(e => e.id === live.id);
   assert.deepEqual([bobEv.status, bobEv.applied, bobEv.own, bobEv.surplus], ['', '未確認', 0, 0]);
@@ -211,7 +212,7 @@ console.log('PASS: events with groups/validation/version conflicts (incl. simult
   assert.equal((await widget(bobKey)).status, 401);
   await call('admin@example.com', 'saveMember', { id: B, name: 'Bob', email: 'bob@example.com', role: 'member', active: true });
   assert.equal((await widget(bobKey)).status, 200);
-  console.log('PASS: widget key per member (owner-only, stable, re-issue revokes), widget API returns own statuses only, no ticket numbers/URLs/memos/other members');
+  console.log('PASS: widget key per member (owner-only, stable, re-issue revokes), widget API returns own statuses + own 自分用 numbers only, no other numbers/URLs/memos/other members');
 }
 
 /* ---------- durable save receipts ---------- */
