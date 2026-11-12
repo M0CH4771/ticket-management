@@ -2,7 +2,7 @@
 // Alignment is deliberately pessimistic: the ListWidget centers its children, so anything
 // that is not a full-width row shows up as mis-aligned.
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-export function makeScriptable({ family, fetchApi, mode = 'light', files = new Map() }) {
+export function makeScriptable({ family, fetchApi, mode = 'light', files = new Map(), screen = { width: 393, height: 852 } }) {
   let current = null;
   class Color {
     constructor(hex, alpha = 1) { this.hex = hex.startsWith('#') ? hex : '#' + hex; this.alpha = alpha; }
@@ -36,7 +36,8 @@ export function makeScriptable({ family, fetchApi, mode = 'light', files = new M
   const FileManager = { local: () => ({ joinPath: (a, b) => a + '/' + b, libraryDirectory: () => '/lib', fileExists: p => files.has(p), readString: p => files.get(p), writeString: (p, v) => files.set(p, v) }) };
   const config = { widgetFamily: family, runsInWidget: true, runsInAccessoryWidget: /^accessory/.test(family) };
   const Script = { setWidget: w => { current = w; }, complete() {} };
-  return { globals: { Color, Font, Size, ListWidget, Request, FileManager, config, Script }, result: () => current };
+  const Device = { screenSize: () => new Size(screen.width, screen.height) };
+  return { globals: { Color, Font, Size, ListWidget, Request, FileManager, config, Script, Device }, result: () => current };
 }
 
 export function toHtml(node, ctx, parentDir = 'column') {

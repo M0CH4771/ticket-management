@@ -372,7 +372,10 @@ function oshiWidget(w, family, data, today) {
     r.addSpacer();
   }
   w.addSpacer(6);
-  const max = weeks > 5 ? 3 : 5;
+  // Large widgets on small phones (iPhone SE: 667pt tall) have about 30pt less height.
+  let compact = false;
+  try { compact = Device.screenSize().height < 700; } catch (e) {}
+  const max = (weeks > 5 ? 5 : 7) - (compact ? 2 : 0);
   if (!upcoming.length) ltext(w, 'これからの予定はありません', 11, T.ink3, '', 1);
   for (const it of upcoming.slice(0, max)) { itemRow(w, it, today, 'large'); w.addSpacer(4); }
   w.addSpacer();
