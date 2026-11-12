@@ -186,10 +186,12 @@ function countdownWidget(w, family, data, today) {
   if (family === 'accessoryInline') { text(w, e ? '締切' + until(n) + ' ' + e.title : '締切の予定なし', 12, null, '', 1); return; }
   if (family === 'accessoryCircular') {
     w.addAccessoryWidgetBackground = true;
+    w.addSpacer();
     const s = w.addStack(); s.layoutVertically(); s.centerAlignContent();
     const a = text(s, '締切', 10, null, 'semibold', 1); a.centerAlignText();
     const b = text(s, e ? (n <= 0 ? '今日' : n === 1 ? '明日' : String(n)) : '-', e && n > 1 ? 22 : 15, null, 'round', 1); b.centerAlignText(); b.minimumScaleFactor = 0.6;
     if (e && n > 1) { const c = text(s, '日', 9, null, '', 1); c.centerAlignText(); }
+    w.addSpacer();
     return;
   }
   if (family === 'accessoryRectangular') {
@@ -219,10 +221,12 @@ function nextWidget(w, family, data, today) {
   if (family === 'accessoryInline') { text(w, e ? '参戦' + until(n) + ' ' + e.title : '参戦予定なし', 12, null, '', 1); return; }
   if (family === 'accessoryCircular') {
     w.addAccessoryWidgetBackground = true;
+    w.addSpacer();
     const s = w.addStack(); s.layoutVertically(); s.centerAlignContent();
     const a = text(s, '参戦', 10, null, 'semibold', 1); a.centerAlignText();
     const b = text(s, e ? (n <= 0 ? '今日' : n === 1 ? '明日' : String(n)) : '-', e && n > 1 ? 22 : 15, null, 'round', 1); b.centerAlignText(); b.minimumScaleFactor = 0.6;
     if (e && n > 1) { const c = text(s, '日', 9, null, '', 1); c.centerAlignText(); }
+    w.addSpacer();
     return;
   }
   if (family === 'accessoryRectangular') {
