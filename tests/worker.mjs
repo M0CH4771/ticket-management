@@ -179,6 +179,41 @@ assert.equal(updated.version, '2');
 }
 console.log('PASS: events with groups/validation/version conflicts (incl. simultaneous edits), attendance + application, ticket batch with NFKC duplicates, owner-only edits, private ticket fields');
 
+/* ---------- iPhone widget key + read-only widget API ---------- */
+{
+  const widget = (key, init = {}) => worker.fetch(new Request('https://api.example/api/widget', { headers: key ? { authorization: 'Bearer ' + key } : {}, ...init }), env);
+  await rejects(call('alice@example.com', 'getWidgetKey', B), /登録されたメンバーではありません/, 403);
+  const { key } = await call('alice@example.com', 'getWidgetKey', A);
+  assert.match(key, /^wk_[A-Za-z0-9_-]{43}$/);
+  assert.equal((await call('alice@example.com', 'getWidgetKey', A)).key, key, 'same key is returned again for each widget type');
+  const bobKey = (await call('bob@example.com', 'getWidgetKey', B)).key;
+  assert.notEqual(bobKey, key);
+  let res = await widget(key);
+  assert.equal(res.status, 200); assert.equal(res.headers.get('cache-control'), 'no-store');
+  const body = await res.json();
+  assert.equal(body.today, today); assert.equal(body.member.name, 'Alice'); assert.deepEqual(body.groups, ['グループA', 'グループB']);
+  const ev = body.events.find(e => e.id === live.id);
+  assert.deepEqual({ date: ev.date, deadline: ev.deadline, throws: ev.throws, status: ev.status, applied: ev.applied, own: ev.own, surplus: ev.surplus },
+    { date: later, deadline: tomorrow, throws: '3', status: '不参加', applied: '申込不要', own: 1, surplus: 0 });
+  const raw = JSON.stringify(body);
+  for (const secret of ['A12', 'A35', 'example.com/mine', '連絡済み', '友人', 'alice@example.com', 'Bob', 'sheet']) assert.ok(!raw.includes(secret), 'widget leaks ' + secret);
+  // Bob has no attendance row: 未確認. His own 50 unissued tickets are not counted as 自分用/余り.
+  const bobEv = (await (await widget(bobKey)).json()).events.find(e => e.id === live.id);
+  assert.deepEqual([bobEv.status, bobEv.applied, bobEv.own, bobEv.surplus], ['', '未確認', 0, 0]);
+  for (const bad of [null, 'wk_short', key.slice(0, -1) + (key.endsWith('A') ? 'B' : 'A')]) {
+    res = await widget(bad); assert.equal(res.status, 401); assert.match((await res.json()).error, /キーが無効/);
+  }
+  assert.equal((await widget(key, { method: 'POST', body: '{}' })).status, 405);
+  // Re-issuing invalidates the old key; stopping the member blocks the widget too.
+  const fresh = (await call('alice@example.com', 'resetWidgetKey', A)).key;
+  assert.notEqual(fresh, key); assert.equal((await widget(key)).status, 401); assert.equal((await widget(fresh)).status, 200);
+  await call('admin@example.com', 'saveMember', { id: B, name: 'Bob', email: 'bob@example.com', role: 'member', active: false });
+  assert.equal((await widget(bobKey)).status, 401);
+  await call('admin@example.com', 'saveMember', { id: B, name: 'Bob', email: 'bob@example.com', role: 'member', active: true });
+  assert.equal((await widget(bobKey)).status, 200);
+  console.log('PASS: widget key per member (owner-only, stable, re-issue revokes), widget API returns own statuses only, no ticket numbers/URLs/memos/other members');
+}
+
 /* ---------- durable save receipts ---------- */
 {
   const rid = { response: 'patch-v1', requestId: crypto.randomUUID() };

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js">
-<link rel="stylesheet" href="./styles.css?v=20261109b"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
+<link rel="stylesheet" href="./styles.css?v=20261112"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
   <div class="startup-content"><div class="startup-mark"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#12233f"/><defs><mask id="startup-hole"><rect x="-400" y="-400" width="800" height="800" fill="#fff"/><polygon points="-49.5,-54.0 -35.4,-15.4 5.7,-13.9 -26.7,11.4 -15.4,50.9 -49.5,28.0 -83.6,50.9 -72.3,11.4 -104.7,-13.9 -63.6,-15.4" fill="#000"/></mask></defs><g transform="translate(244 262) scale(1.04) rotate(-12)"><path class="ticket" d="M-145.0,-95.0 H61.0 A22,22 0 0 1 83.0,-73.0 V73.0 A22,22 0 0 1 61.0,95.0 H-145.0 A22,22 0 0 1 -167.0,73.0 V26.0 A26,26 0 0 0 -167.0,-26.0 V-73.0 A22,22 0 0 1 -145.0,-95.0 Z" fill="#ffffff" mask="url(#startup-hole)"/><circle cx="83.0" cy="-77.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="0.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="77.0" r="6.5" fill="#12233f"/><g class="stub-tear"><g class="stub" transform="translate(99.0 8) rotate(11 0 95.0)"><path d="M22,-95.0 H74 A22,22 0 0 1 96,-73.0 V-26.0 A26,26 0 0 0 96,26.0 V73.0 A22,22 0 0 1 74,95.0 H22 A22,22 0 0 1 0,73.0 V-73.0 A22,22 0 0 1 22,-95.0 Z" fill="#ff5b45"/></g></g></g></svg></div><strong class="startup-title">Ticket Management</strong></div>
 </div>
 <script id="startup-once">try{var d=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});if(localStorage.getItem('ticket-startup-day')===d)document.getElementById('startup-screen').remove();else localStorage.setItem('ticket-startup-day',d)}catch(e){}</script>
@@ -395,12 +395,63 @@ function updateSaveView(action){
   });
   showRefreshState();
 }
+const WIDGET_TYPES=[
+  {type:'today',name:'今日の締切',size:'小・中',desc:'今日が抽選締切のイベントと、自分の申込状況。締切がない日は次の締切を表示します。'},
+  {type:'deadlines',name:'締切が近い順',size:'中・大（小も可）',desc:'これからの抽選締切を近い順に。あと何日・枠数・自分の申込状況が分かります。'},
+  {type:'countdown',name:'次の締切カウントダウン',size:'ロック画面（小も可）',desc:'「締切 あと2日」をロック画面に。申込状況が未確認の締切を優先して表示します。'},
+  {type:'next',name:'次の参戦',size:'小・中',desc:'参戦予定を「参戦」にしたイベントのうち、いちばん近いもの。あと何日・会場・自分用の枚数。'},
+  {type:'oshi',name:'推しの予定',size:'大（中・小は一覧）',desc:'選んだグループのライブ日と抽選締切をカレンダーで表示します。'},
+];
+function widgetScript(type,key,groups){
+  const cfg={type,key,api:String(window.LIVE_POCKET_CONFIG.apiUrl).replace(/\/+$/,''),app:new URL('./',location.href).href,groups:type==='oshi'?groups:[]};
+  const core=new URL('./widget/core.js',location.href).href;
+  const name=WIDGET_TYPES.find(t=>t.type===type)?.name||type;
+  return `// チケマネ ウィジェット：${name}
+// Scriptableにこのまま貼り付けてください。キーはあなた専用です（人に送らないでください）。
+const CONFIG = ${JSON.stringify(cfg)};
+const fm = FileManager.local(), saved = fm.joinPath(fm.libraryDirectory(), 'ticket-widget-core.js');
+let code = '';
+try { const r = new Request('${core}?h=' + Math.floor(Date.now() / 3600000)); r.timeoutInterval = 10; code = await r.loadString(); if (code.includes('TICKET_WIDGET_CORE')) fm.writeString(saved, code); else code = ''; } catch (e) {}
+if (!code && fm.fileExists(saved)) code = fm.readString(saved);
+if (!code) throw new Error('チケマネのウィジェットを読み込めませんでした。通信できる場所でもう一度実行してください');
+await new (Object.getPrototypeOf(async function () {}).constructor)('CONFIG', code)(CONFIG);
+`;
+}
+async function widgetSettings(){
+  managerLiveId='';managerMode='';
+  const groups=[...new Set((data?.lives||[]).filter(l=>!l.archived).flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));
+  let chosen=[];try{chosen=JSON.parse(localStorage.getItem('ticket-widget-groups')||'[]').filter(g=>groups.includes(g))}catch(e){}
+  const card=t=>`<li class="widget-type"><div class="widget-type-head"><strong>${t.name}</strong><span class="widget-size">${t.size}</span></div><p>${t.desc}</p>${t.type==='oshi'?`<fieldset class="widget-groups"><legend>表示するグループ（選ばないとすべて）</legend>${groups.length?groups.map(g=>`<label><input type="checkbox" name="widget-group" value="${esc(g)}" ${chosen.includes(g)?'checked':''}> ${esc(g)}</label>`).join(''):'<span class="muted">グループが登録されたイベントがまだありません</span>'}</fieldset>`:''}<button type="button" class="primary" data-widget-copy="${t.type}" disabled>スクリプトをコピー</button></li>`;
+  modal('iPhoneウィジェット',`<p>無料アプリ「Scriptable」を使って、締切や参戦予定をホーム画面・ロック画面に表示できます（iPhoneのみ）。</p>
+  <ol class="admin-steps"><li>App Storeで<a href="https://apps.apple.com/jp/app/scriptable/id1405459188" target="_blank" rel="noopener">Scriptable</a>を入れます。</li><li>下で使いたい種類の<b>スクリプトをコピー</b>を押します。</li><li>Scriptableを開いて右上の<b>＋</b>を押し、貼り付けます。上の名前を「チケマネ 締切」などに変えて<b>Done</b>。</li><li>ホーム画面（ロック画面）を長押し →<b>編集</b>→<b>ウィジェットを追加</b>→<b>Scriptable</b>を選んでサイズを決めて追加します。</li><li>置いたウィジェットを長押し →<b>ウィジェットを編集</b>→<b>Script</b>で3のスクリプトを選びます。</li></ol>
+  <p id="widget-status" class="muted" role="status">準備しています…</p>
+  <ul class="widget-types">${WIDGET_TYPES.map(card).join('')}</ul>
+  <details class="widget-reset"><summary>キーを作り直す</summary><p class="muted">スクリプトを人に送ってしまったときに使います。作り直すと、今あるウィジェットはすべて表示されなくなるので、もう一度コピーして貼り直してください。</p><button type="button" id="widget-reset" class="danger">キーを作り直す</button></details>`,()=>{});
+  $('submit-save').hidden=true;
+  let key='';
+  const ready=k=>{key=k;$('widget-status').textContent='';document.querySelectorAll('[data-widget-copy]').forEach(b=>b.disabled=false)};
+  try{ready((await rpc('getWidgetKey',memberId)).key)}catch(e){$('widget-status').textContent=/未対応/.test(e.message||'')?'サーバー側の準備がまだです。管理者に連絡してください':e.message||'準備できませんでした。再読込してください';return}
+  document.querySelectorAll('input[name="widget-group"]').forEach(c=>c.onchange=()=>{const v=[...document.querySelectorAll('input[name="widget-group"]:checked')].map(x=>x.value);try{localStorage.setItem('ticket-widget-groups',JSON.stringify(v))}catch(e){}});
+  document.querySelectorAll('[data-widget-copy]').forEach(b=>b.onclick=async()=>{
+    const type=b.dataset.widgetCopy,picked=[...document.querySelectorAll('input[name="widget-group"]:checked')].map(x=>x.value);
+    const script=widgetScript(type,key,picked);
+    try{await navigator.clipboard.writeText(script);b.textContent='コピーしました';setTimeout(()=>{b.textContent='スクリプトをコピー'},2500)}
+    catch(e){const area=document.createElement('textarea');area.readOnly=true;area.rows=8;area.className='widget-script';area.value=script;b.after(area);area.focus();area.select();$('widget-status').textContent='自動でコピーできませんでした。表示された文章を全部選択してコピーしてください'}
+  });
+  $('widget-reset').onclick=async()=>{
+    if(busy||!confirm('キーを作り直しますか？今あるウィジェットは表示されなくなります'))return;
+    busy=true;$('widget-reset').disabled=true;
+    try{ready((await rpc('resetWidgetKey',memberId)).key);$('widget-status').textContent='キーを作り直しました。使うウィジェットのスクリプトをコピーして、Scriptableに貼り直してください'}
+    catch(e){$('widget-status').textContent=e.message}
+    finally{busy=false;$('widget-reset').disabled=false}
+  };
+}
 function permissionInfo(){
   const admin=Boolean(data?.me?.isAdmin);
   const role=admin?'管理者':'メンバー';
   const body=`<p><strong>現在の権限：${role}</strong></p>
   <h3>全メンバー共通</h3>
-  <ul><li>イベント一覧の閲覧、新規登録・編集・削除（すべてのイベント）</li><li>自分の参戦予定・締切日の申込状況の変更</li><li>自分のチケット番号・状態・URLの登録、編集、削除</li><li>全員の参戦状況や、共有対象のチケット番号・余り情報の閲覧</li><li>自分の端末の通知設定</li></ul>
+  <ul><li>イベント一覧の閲覧、新規登録・編集・削除（すべてのイベント）</li><li>自分の参戦予定・締切日の申込状況の変更</li><li>自分のチケット番号・状態・URLの登録、編集、削除</li><li>全員の参戦状況や、共有対象のチケット番号・余り情報の閲覧</li><li>自分の端末の通知設定${usesCloudflare()?'・iPhoneウィジェットの設定':''}</li></ul>
   <h3>管理者だけ</h3>
   <p>${usesCloudflare()?'メンバーの登録・権限変更・利用停止、LINE配信時刻と昼夜の通知内容の変更ができます。':'LINE配信時刻と昼夜の通知内容を変更できます。'}</p>
   <p class="muted">管理者でも、他のメンバーのチケット情報は編集できません。${usesCloudflare()?'メンバーはアカウントメニューの「メンバー管理」で登録します。':'メンバーの登録・権限変更は管理スプレッドシートの Members シートで行います。'}</p>`;
@@ -480,7 +531,7 @@ function applyTheme(mode){
 }
 function accountMenu(){
   const name=esc(data.me.name),admin=data.me.isAdmin,role=admin?'管理者':'メンバー';
-  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${admin&&usesCloudflare()?'<button type="button" id="member-admin">メンバー管理</button>':''}${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><p class="theme-switch-label" id="theme-label">表示</p><div class="theme-switch" role="group" aria-labelledby="theme-label">${[['auto','自動'],['light','ライト'],['dark','ダーク']].map(([v,l])=>`<button type="button" data-theme-mode="${v}" aria-pressed="${themeMode()===v}">${l}</button>`).join('')}</div><button type="button" id="logout">ログアウト</button></div></details>`;
+  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${usesCloudflare()?'<button type="button" id="widget-settings">iPhoneウィジェット</button>':''}${admin&&usesCloudflare()?'<button type="button" id="member-admin">メンバー管理</button>':''}${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><p class="theme-switch-label" id="theme-label">表示</p><div class="theme-switch" role="group" aria-labelledby="theme-label">${[['auto','自動'],['light','ライト'],['dark','ダーク']].map(([v,l])=>`<button type="button" data-theme-mode="${v}" aria-pressed="${themeMode()===v}">${l}</button>`).join('')}</div><button type="button" id="logout">ログアウト</button></div></details>`;
 }
 function renderHome(){if(!data)return;const today=japanDay();lastDay=today;const todayPending=(data.lives||[]).filter(l=>!l.archived&&l.lotteryDeadline===today&&myApplicationStatus(l)==='未確認').length;const lives=sortedEvents(data.lives.filter(l=>archiveView?l.archived===true:(l.date>=today&&!l.archived)),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
 $('account').innerHTML=accountMenu();
@@ -505,6 +556,7 @@ $('notification-settings').onclick=()=>{closeAccount();import('./notifications.j
 if($('line-admin-settings'))$('line-admin-settings').onclick=()=>{closeAccount();lineSettingsForm()};
 if($('member-admin'))$('member-admin').onclick=()=>{closeAccount();memberAdmin()};
 $('permissions-help').onclick=()=>{closeAccount();permissionInfo()};
+if($('widget-settings'))$('widget-settings').onclick=()=>{closeAccount();widgetSettings()};
 document.querySelectorAll('[data-theme-mode]').forEach(b=>b.onclick=()=>applyTheme(b.dataset.themeMode));
 document.querySelectorAll('[data-my-filter]').forEach(b=>b.onclick=()=>{myFilter=b.dataset.myFilter;document.querySelectorAll('[data-my-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.myFilter===myFilter)));drawTiles(lives,today)});
 $('my-surplus-list').onclick=personalSurplusList;$('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();

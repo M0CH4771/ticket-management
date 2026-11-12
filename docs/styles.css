@@ -398,6 +398,19 @@ dialog::backdrop{background:rgba(18,35,63,.45)}
 .admin-member.is-stopped strong{color:var(--ink-3)}
 .admin-member>button{flex:none;min-height:36px;padding:4px 12px;font-size:var(--fs-sm)}
 .admin-steps{margin:8px 0;padding-left:20px;font-size:var(--fs-sm);line-height:1.8}
+.widget-types{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:10px}
+.widget-type{padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface)}
+.widget-type-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.widget-size{font-size:var(--fs-xs,12px);color:var(--ink-3);white-space:nowrap}
+.widget-type p{margin:4px 0 10px;font-size:var(--fs-sm);color:var(--ink-2);line-height:1.6}
+.widget-type>button{width:100%}
+.widget-groups{margin:0 0 10px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-sm);display:flex;flex-wrap:wrap;gap:6px 14px}
+.widget-groups legend{padding:0 4px;font-size:var(--fs-xs,12px);color:var(--ink-3)}
+.widget-groups label{display:inline-flex;align-items:center;gap:8px;min-height:36px;font-size:var(--fs-sm);white-space:nowrap}
+.widget-groups input{display:inline-block;width:20px;height:20px;min-height:0;margin:0;padding:0;accent-color:var(--blue)}
+.widget-script{width:100%;margin-top:8px;font:12px/1.5 ui-monospace,Menlo,monospace}
+.widget-reset{margin-top:14px;font-size:var(--fs-sm)}
+.widget-reset summary{cursor:pointer;color:var(--ink-2)}
 .admin-import code{padding:1px 5px;border-radius:4px;background:var(--mute-2);font-size:.92em;overflow-wrap:anywhere}
 .admin-import input[type=file]{min-height:0;padding:10px;font-size:var(--fs-sm)}
 .admin-import #import-run{width:100%;margin-top:12px}

@@ -8,8 +8,8 @@
 (() => {
   const pending = new Map();
   let connection, dispose;
-  const methods = new Set(['getAuthConfig', 'getMembers', 'registerMember', 'getData', 'saveData', 'getAdminSettings', 'saveAdminSettings', 'getPushSettings', 'savePushSubscription', 'removePushSubscription', 'testPushSubscription', 'listMembers', 'saveMember', 'importData']);
-  const mutations = new Set(['saveData', 'registerMember', 'saveAdminSettings', 'savePushSubscription', 'removePushSubscription', 'testPushSubscription', 'saveMember', 'importData']);
+  const methods = new Set(['getAuthConfig', 'getMembers', 'registerMember', 'getData', 'saveData', 'getAdminSettings', 'saveAdminSettings', 'getPushSettings', 'savePushSubscription', 'removePushSubscription', 'testPushSubscription', 'listMembers', 'saveMember', 'importData', 'getWidgetKey', 'resetWidgetKey']);
+  const mutations = new Set(['saveData', 'registerMember', 'saveAdminSettings', 'savePushSubscription', 'removePushSubscription', 'testPushSubscription', 'saveMember', 'importData', 'getWidgetKey', 'resetWidgetKey']);
   const timeoutMessage = mutation => mutation ? '応答がありません。登録済みの可能性があります。再読込して内容を確認してから操作してください。' : '読み込みに時間がかかっています。再読込を押して、もう一度お試しください。';
   function apiBase() {
     const value = window.LIVE_POCKET_CONFIG?.apiUrl;

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS save_requests (id TEXT PRIMARY KEY, member_id TEXT NO
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS push_devices (id TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS guards (ok INTEGER NOT NULL CHECK (ok = 1));
+CREATE TABLE IF NOT EXISTS widget_keys (member_id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL);
 `;
 
 const TICKET_STATUSES = ['未発券', '自分用', '余り', '取引中', '捌けた'];
@@ -690,12 +691,64 @@ async function lineWebhook(request, env) {
   return new Response('OK');
 }
 
+/* ---------- iPhone widgets (Scriptable) ---------- */
+// Each member gets one read-only key. It only returns that member's own schedule and statuses:
+// no ticket numbers, ticket URLs, memos, or other members' data.
+const WIDGET_KEY = /^wk_[A-Za-z0-9_-]{43}$/;
+async function getWidgetKey({ db, me }, memberId, reset) {
+  sameMember(me, memberId);
+  if (reset !== true) {
+    const row = await first(db, 'SELECT token FROM widget_keys WHERE member_id = ?', me.id);
+    if (row) return { key: row.token };
+  }
+  const token = 'wk_' + bytesToB64url(crypto.getRandomValues(new Uint8Array(32)));
+  await db.prepare('INSERT INTO widget_keys(member_id, token, created_at) VALUES(?, ?, ?) ON CONFLICT(member_id) DO UPDATE SET token = excluded.token, created_at = excluded.created_at')
+    .bind(me.id, token, new Date().toISOString()).run();
+  return { key: token };
+}
+async function widgetData(request, env, now = new Date()) {
+  const headers = { 'cache-control': 'no-store' };
+  try {
+    if (request.method !== 'GET') throw new AppError('Method not allowed', 405);
+    const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    const invalid = 'ウィジェットのキーが無効です。チケマネでスクリプトをコピーし直してください';
+    if (!WIDGET_KEY.test(token)) throw new AppError(invalid, 401);
+    await ensureSchema(env);
+    const db = env.DB;
+    const member = await first(db, 'SELECT m.id, m.name, m.active FROM widget_keys k JOIN members m ON m.id = k.member_id WHERE k.token = ?', token);
+    if (!member || member.active !== 1) throw new AppError(invalid, 401);
+    const today = japanToday(now);
+    const [events, attendance, tickets] = await Promise.all([
+      all(db, 'SELECT id, title, date, venue, lottery_deadline, required_throws, groups FROM events WHERE archived = 0 AND (date >= ? OR lottery_deadline >= ?) ORDER BY date, title', today, today),
+      all(db, 'SELECT event_id, status, applied FROM attendance WHERE member_id = ?', member.id),
+      all(db, 'SELECT event_id, status FROM tickets WHERE member_id = ?', member.id),
+    ]);
+    const mine = new Map(attendance.map(a => [a.event_id, a]));
+    const count = (eventId, status) => tickets.filter(t => t.event_id === eventId && t.status === status).length;
+    const out = events.map(e => {
+      const a = mine.get(e.id);
+      const status = a?.status || '';
+      const applied = status === '不参加' ? '申込不要' : a?.applied && a.applied !== '未申込' ? a.applied : '未確認';
+      return { id: e.id, title: e.title, date: e.date, venue: e.venue, deadline: e.lottery_deadline, throws: e.required_throws, groups: readGroups(e.groups),
+        status, applied, own: count(e.id, '自分用'), surplus: count(e.id, '余り') };
+    });
+    return json({ ok: true, today, member: { name: member.name }, events: out,
+      groups: [...new Set(out.flatMap(e => e.groups))].sort((a, b) => a.localeCompare(b, 'ja')), updatedAt: now.toISOString() }, 200, headers);
+  } catch (e) {
+    const status = e instanceof AppError ? e.status : 500;
+    if (!(e instanceof AppError)) console.error(e);
+    return json({ ok: false, error: e instanceof AppError ? e.message : '読み込みに失敗しました' }, status, headers);
+  }
+}
+
 /* ---------- RPC ---------- */
 const METHODS = {
   getMembers: async ({ me }) => [{ id: me.id, name: me.name }],
   getData: async ({ db, me }, memberId) => { sameMember(me, memberId); await archivePastEvents(db); return snapshot(db, me); },
   saveData, getAdminSettings, saveAdminSettings, getPushSettings, savePushSubscription, removePushSubscription, testPushSubscription,
   listMembers, saveMember, registerMember, importData,
+  getWidgetKey: (ctx, memberId) => getWidgetKey(ctx, memberId, false),
+  resetWidgetKey: (ctx, memberId) => getWidgetKey(ctx, memberId, true),
 };
 function corsHeaders(request, env) {
   const origin = request.headers.get('origin') || '';
@@ -737,6 +790,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/api/rpc') return rpc(request, env);
+    if (url.pathname === '/api/widget') return widgetData(request, env);
     if (request.method === 'POST' && (url.pathname === '/' || url.pathname === '/line/webhook') && request.headers.has('x-line-signature')) return lineWebhook(request, env);
     if (request.method === 'GET' && url.pathname === '/') return new Response('Ticket Management API is running.');
     return new Response('Not found', { status: 404 });
@@ -747,4 +801,4 @@ export default {
 };
 
 // Exposed for tests only.
-export const __test = { normalizeDate, verifyIdToken, scheduled, sendDeadlineNotifications, pushIdentity, resetCaches: () => { schemaReady = null; jwks = { keys: [], expires: 0 }; keyCache.clear(); fcmToken = { value: '', expires: 0 }; } };
+export const __test = { normalizeDate, widgetData, verifyIdToken, scheduled, sendDeadlineNotifications, pushIdentity, resetCaches: () => { schemaReady = null; jwks = { keys: [], expires: 0 }; keyCache.clear(); fcmToken = { value: '', expires: 0 }; } };
