@@ -70,13 +70,19 @@ function ltext(parent, value, size, color, weight, lines) {
   row.addSpacer();
   return t;
 }
-function header(w, title, color, right) {
+// Header: title on the left; on the right the count (medium/large) and when the data was fetched.
+let FAMILY = 'medium', UPDATED = '';
+function header(w, title, color, right, narrow) {
   const h = w.addStack(); h.layoutHorizontally(); h.centerAlignContent();
   text(h, title, 13, color, 'bold', 1);
+  h.addSpacer(4);
   h.addSpacer();
-  if (right) text(h, right, 11, T.ink3, '', 1);
+  const small = narrow || FAMILY === 'small';
+  const info = [small ? '' : right, UPDATED ? UPDATED + (small ? '' : '更新') : ''].filter(Boolean).join(' ・ ');
+  if (info) { const t = text(h, info, small ? 10 : 11, T.ink3, '', 1); t.rightAlignText(); }
   return h;
 }
+const hhmm = iso => { const d = new Date(new Date(iso).getTime() + 9 * 3600000); return isNaN(d) ? '' : d.getUTCHours() + ':' + String(d.getUTCMinutes()).padStart(2, '0'); };
 function chip(parent, label, fg, bg) {
   const s = parent.addStack(); s.setPadding(2, 6, 2, 6); s.cornerRadius = 6; s.backgroundColor = bg; s.centerAlignContent();
   text(s, label, 10, fg, 'bold', 1);
@@ -264,7 +270,7 @@ function nextWidget(w, family, data, today) {
   if (family !== 'small') { main.layoutHorizontally(); main.topAlignContent(); }
   const card = family === 'small' ? w : main.addStack();
   if (family !== 'small') { card.layoutVertically(); card.size = new Size(138, 0); }
-  header(card, '次のイベント', T.blue, '');
+  header(card, '次のイベント', T.blue, '', true);
   card.addSpacer(4);
   ltext(card, until(n), 24, n <= 0 ? T.coral : T.ink, 'round', 1);
   card.addSpacer(2);
@@ -394,6 +400,8 @@ async function main() {
   } else {
     const today = japanToday();
     STALE = !!stale;
+    FAMILY = family;
+    UPDATED = hhmm(data.updatedAt);
     const draw = { today: todayWidget, deadlines: deadlinesWidget, countdown: countdownWidget, next: nextWidget, oshi: oshiWidget }[CONFIG.type] || deadlinesWidget;
     draw(w, family, data, today);
     if (!accessory) staleNote(w, stale);
