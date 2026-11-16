@@ -410,6 +410,12 @@ dialog::backdrop{background:rgba(18,35,63,.45)}
 .widget-groups input{display:inline-block;width:20px;height:20px;min-height:0;margin:0;padding:0;accent-color:var(--blue)}
 .widget-groups-note{margin:4px 0 0;font-size:var(--fs-xs)}
 .widget-type p.widget-uses-groups{margin:-4px 0 10px;font-size:var(--fs-xs);color:var(--blue-ink);font-weight:600}
+.line-link p{margin:0 0 10px;line-height:1.7}
+.line-link-done{font-weight:700;color:var(--green-ink,var(--green))}
+.line-code{display:flex;align-items:center;gap:10px;margin:12px 0 8px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface)}
+.line-code code{flex:1;font:700 22px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.06em;color:var(--ink);user-select:all;-webkit-user-select:all}
+.line-code button{flex:none;min-width:96px}
+.line-link>button{width:100%;margin-top:4px}
 .browser-choice{margin:12px 0;padding:0;border:0;display:grid}
 .browser-choice label{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 4px;border-bottom:1px solid var(--line);font-size:var(--fs-base,16px)}
 .browser-choice label:last-child{border-bottom:0}

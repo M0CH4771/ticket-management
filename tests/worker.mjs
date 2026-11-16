@@ -43,14 +43,15 @@ async function token(email, extra = {}) {
 
 /* ---------- outbound HTTP mock ---------- */
 const outbound = [];
-let lineStatus = 200, fcmStatus = 200;
+let lineStatus = 200, lineV2Status = 200, fcmStatus = 200;
 globalThis.fetch = async (url, init = {}) => {
   url = String(url);
   outbound.push({ url, init });
   if (url.startsWith('https://www.googleapis.com/service_accounts/')) return new Response(JSON.stringify({ keys: [publicJwk] }), { headers: { 'cache-control': 'public, max-age=3600' } });
   if (url === 'https://oauth2.googleapis.com/token') return new Response(JSON.stringify({ access_token: 'fcm-access' }));
   if (url.startsWith('https://fcm.googleapis.com/')) return new Response(JSON.stringify(fcmStatus === 200 ? { name: 'sent' } : { error: { details: [{ errorCode: 'UNREGISTERED' }] } }), { status: fcmStatus });
-  if (url === 'https://api.line.me/v2/bot/message/push') return new Response('{}', { status: lineStatus });
+  if (url === 'https://api.line.me/v2/bot/message/push') return new Response('{}', { status: JSON.parse(init.body).messages[0].type === 'textV2' ? lineV2Status : lineStatus });
+  if (url === 'https://api.line.me/v2/bot/message/reply') return new Response('{}');
   throw new Error('unexpected fetch ' + url);
 };
 
@@ -296,6 +297,64 @@ async function lineHook(body, secret = 'line-secret') {
   const night = JSON.parse(outbound.find(r => r.url.includes('line.me')).init.body).messages[0].text;
   assert.match(night, /未確認：.*Alice/); assert.match(night, /Bob/);
   assert.match(night, /チケットURL：/); assert.match(night, /枠数：2枚\n未確認：/);
+
+  // LINE link: code from the app, posted in the group -> the 21:00 list mentions the member.
+  const U_ALICE = 'U' + 'a'.repeat(32), U_BOB = 'U' + 'b'.repeat(32);
+  await rejects(call('alice@example.com', 'getLineLink', B), /登録されたメンバーではありません/, 403);
+  const link = await call('alice@example.com', 'getLineLink', A);
+  assert.equal(link.configured, true); assert.equal(link.linked, false); assert.match(link.code, /^\d{6}$/);
+  assert.equal((await call('alice@example.com', 'getLineLink', A)).code, link.code, 'same code while valid');
+  const say = (text, userId, source = { type: 'group', groupId: 'Cgroup1' }) => lineHook({ events: [{ type: 'message', replyToken: 'r-' + Math.random(), source: { ...source, userId }, message: { type: 'text', text } }] });
+  const replies = () => outbound.filter(r => r.url.endsWith('/reply')).map(r => JSON.parse(r.init.body).messages[0].text);
+  outbound.length = 0;
+  await say('連携 ' + link.code, U_ALICE, { type: 'group', groupId: 'Cother' }); // another group: ignored
+  assert.equal(replies().length, 0);
+  await say('こんにちは', U_ALICE); assert.equal(replies().length, 0, 'ordinary chat is ignored');
+  await say('連携 000000', U_BOB); assert.match(replies()[0], /正しくないか、期限切れ/);
+  await say('連携 ' + link.code.replace(/\d/g, d => String.fromCharCode(0xFF10 + Number(d))), U_ALICE); // full-width digits work
+  assert.match(replies()[1], /Aliceさんのlineを連携しました|AliceさんのLINEを連携しました/);
+  assert.equal(env.DB.raw.prepare('SELECT user_id FROM line_links WHERE member_id = ?').get(A).user_id, U_ALICE);
+  assert.equal((await call('alice@example.com', 'getLineLink', A)).linked, true);
+  await say('連携 ' + link.code, U_BOB); assert.match(replies()[2], /正しくないか、期限切れ/, 'a code works only once');
+  for (let i = 0; i < 5; i++) await say('連携 11111' + i, U_BOB);
+  assert.match(replies().at(-1), /1時間ほど待って/, 'repeated wrong codes are throttled');
+
+  // 21:00 again (new day state): Alice is mentioned, Bob (not linked) stays plain text. 12:00 never mentions.
+  env.DB.raw.prepare("DELETE FROM settings WHERE key = 'line_state'").run();
+  outbound.length = 0;
+  await __test.sendDeadlineNotifications(env, new Date(today + 'T12:06:00+09:00'));
+  assert.equal(JSON.parse(outbound.find(r => r.url.endsWith('/push')).init.body).messages[0].type, 'text');
+  outbound.length = 0;
+  await __test.sendDeadlineNotifications(env, new Date(today + 'T21:06:00+09:00'));
+  const v2 = JSON.parse(outbound.find(r => r.url.endsWith('/push')).init.body).messages[0];
+  assert.equal(v2.type, 'textV2');
+  assert.match(v2.text, /未確認：.*\{m1\}、Bob/);
+  assert.deepEqual(v2.substitution, { m1: { type: 'mention', mentionee: { type: 'user', userId: U_ALICE } } });
+  // If LINE rejects the mention (e.g. Alice left the group), the list still goes out as plain text.
+  env.DB.raw.prepare("DELETE FROM settings WHERE key = 'line_state'").run();
+  outbound.length = 0; lineV2Status = 400;
+  await __test.sendDeadlineNotifications(env, new Date(today + 'T21:07:00+09:00'));
+  const pushesNow = outbound.filter(r => r.url.endsWith('/push')).map(r => JSON.parse(r.init.body).messages[0]);
+  assert.deepEqual(pushesNow.map(m => m.type), ['textV2', 'text']);
+  assert.match(pushesNow[1].text, /未確認：.*Alice、Bob/);
+  assert.notEqual(outbound.filter(r => r.url.endsWith('/push'))[0].init.headers['X-Line-Retry-Key'], outbound.filter(r => r.url.endsWith('/push'))[1].init.headers['X-Line-Retry-Key']);
+  assert.equal(JSON.parse(env.DB.raw.prepare("SELECT value FROM settings WHERE key = 'line_state'").get().value).night.sent, true);
+  lineV2Status = 200;
+  // Braces in titles cannot break the placeholders.
+  await call('alice@example.com', 'saveData', A, 'live', { title: '{m1} 企画', date: later, lotteryDeadline: today, requiredThrows: '1', purchaseUrl: 'https://example.com/a{b}', groups: [] }, fast);
+  env.DB.raw.prepare("DELETE FROM settings WHERE key = 'line_state'").run();
+  outbound.length = 0;
+  await __test.sendDeadlineNotifications(env, new Date(today + 'T21:08:00+09:00'));
+  const braces = JSON.parse(outbound.find(r => r.url.endsWith('/push')).init.body).messages[0];
+  assert.match(braces.text, /イベント名：｛m1｝ 企画/); assert.match(braces.text, /example\.com\/a%7Bb%7D/);
+  assert.equal(Object.keys(braces.substitution).length, 2, 'Alice mentioned once per event');
+  // Unlink: back to plain names.
+  assert.equal((await call('alice@example.com', 'unlinkLine', A)).linked, false);
+  env.DB.raw.prepare("DELETE FROM settings WHERE key = 'line_state'").run();
+  outbound.length = 0;
+  await __test.sendDeadlineNotifications(env, new Date(today + 'T21:09:00+09:00'));
+  assert.equal(JSON.parse(outbound.find(r => r.url.endsWith('/push')).init.body).messages[0].type, 'text');
+  console.log('PASS: LINE link codes (group only, once, throttled, full-width), 21:00 mentions via textV2, plain fallback on 400, braces escaped, 12:00 unchanged, unlink');
 
   // Web push: per-device groups, one send per day, unregistered tokens disabled.
   const device = { id: crypto.randomUUID(), secret: 'a'.repeat(64), token: 'fcm:token-1' };

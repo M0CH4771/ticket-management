@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS push_devices (id TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS guards (ok INTEGER NOT NULL CHECK (ok = 1));
 CREATE TABLE IF NOT EXISTS widget_keys (member_id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS line_links (member_id TEXT PRIMARY KEY, user_id TEXT NOT NULL UNIQUE, linked_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS line_link_codes (code TEXT PRIMARY KEY, member_id TEXT NOT NULL UNIQUE, expires_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS line_link_failures (user_id TEXT PRIMARY KEY, count INTEGER NOT NULL, window_start INTEGER NOT NULL);
 `;
 
 const TICKET_STATUSES = ['未発券', '自分用', '余り', '取引中', '捌けた'];
@@ -579,8 +582,25 @@ function pushBody(lives) {
   lines.push('タップしてイベントを確認');
   return lines.join('\n');
 }
-const lineEventLines = l => ['', '開催日：' + slash(l.date), 'イベント名：' + l.title, 'チケットURL：' + (l.purchase_url || '未登録'), '枠数：' + (l.required_throws !== '' ? l.required_throws + '枚' : '未設定')];
-async function lineBody(db, events, mode) {
+// textV2 treats {name} as a placeholder, so braces in user-entered text are swapped out when mentions are used.
+const v2Safe = s => String(s).replace(/\{/g, '｛').replace(/\}/g, '｝');
+const v2Url = s => String(s).replace(/\{/g, '%7B').replace(/\}/g, '%7D');
+const lineEventLines = (l, v2 = false) => {
+  const t = v2 ? v2Safe : String, u = v2 ? v2Url : String;
+  return ['', '開催日：' + slash(l.date), 'イベント名：' + t(l.title), 'チケットURL：' + (l.purchase_url ? u(l.purchase_url) : '未登録'), '枠数：' + (l.required_throws !== '' ? t(l.required_throws) + '枚' : '未設定')];
+};
+const LINE_MENTION_MAX = 100;
+// mentions (Map memberId -> LINE userId) turns linked members' names into mentions and returns a textV2 message.
+async function lineBody(db, events, mode, mentions = null) {
+  const v2 = !!mentions, substitution = {}; let mentioned = 0;
+  const nameOf = m => {
+    const userId = v2 ? mentions.get(m.id) : '';
+    if (!userId || mentioned >= LINE_MENTION_MAX) return v2 ? v2Safe(m.name) : m.name;
+    const key = 'm' + (++mentioned);
+    substitution[key] = { type: 'mention', mentionee: { type: 'user', userId } };
+    return '{' + key + '}';
+  };
+  const done = text => v2 ? (mentioned ? { type: 'textV2', text, substitution } : { type: 'text', text }) : text;
   const lines = ['【本日締切】']; let included = 0;
   const add = (block, total) => { if (lines.join('\n').length + block.length > 4500) return false; lines.push(block); included++; return true; };
   if (mode === 'unconfirmed') {
@@ -589,15 +609,22 @@ async function lineBody(db, events, mode) {
     const pending = events.map(l => ({ live: l, names: members.filter(m => {
       const record = statuses.find(a => a.event_id === l.id && a.member_id === m.id);
       return !record || (record.status !== '不参加' && !['申込済み', '申込不要'].includes(record.applied));
-    }).map(m => m.name) })).filter(x => x.names.length);
-    if (!pending.length) return '【本日締切】\n申込状況の未確認はありません。';
-    for (const item of pending) if (!add([...lineEventLines(item.live), '未確認：' + item.names.join('、')].join('\n'))) break;
+    }) })).filter(x => x.names.length);
+    if (!pending.length) return done('【本日締切】\n申込状況の未確認はありません。');
+    for (const item of pending) {
+      const before = mentioned, keys = Object.keys(substitution).length;
+      if (!add([...lineEventLines(item.live, v2), '未確認：' + item.names.map(nameOf).join('、')].join('\n'))) {
+        // Drop the mentions created for a block that did not fit.
+        Object.keys(substitution).slice(keys).forEach(k => delete substitution[k]); mentioned = before;
+        break;
+      }
+    }
     if (included < pending.length) lines.push('', 'ほか' + (pending.length - included) + '件（文字数上限のため省略）');
-    return lines.join('\n');
+    return done(lines.join('\n'));
   }
-  for (const l of events) if (!add(lineEventLines(l).join('\n'))) break;
+  for (const l of events) if (!add(lineEventLines(l, v2).join('\n'))) break;
   if (included < events.length) lines.push('', 'ほか' + (events.length - included) + '件（文字数上限のため省略）');
-  return lines.join('\n');
+  return done(lines.join('\n'));
 }
 async function sendDeadlineNotifications(env, now = new Date()) {
   const db = env.DB, today = japanToday(now), minute = japanTime(now);
@@ -617,10 +644,24 @@ async function sendDeadlineNotifications(env, now = new Date()) {
         s.attempts += 1; s.nextAttempt = now.getTime() + 15 * 60000;
         state[slot] = s; await putSetting(db, 'line_state', JSON.stringify(state)).run();
         try {
+          const mode = slot === 'day' ? settings.dayMode : settings.nightMode;
+          const plain = { type: 'text', text: await lineBody(db, lives, mode) };
+          // 21:00 list of members still 未確認: mention the ones who linked their LINE account.
+          let message = plain;
+          if (slot === 'night' && mode === 'unconfirmed') {
+            const links = new Map((await all(db, 'SELECT l.member_id, l.user_id FROM line_links l JOIN members m ON m.id = l.member_id WHERE m.active = 1')).map(r => [r.member_id, r.user_id]));
+            if (links.size) message = await lineBody(db, lives, mode, links);
+          }
           // The same retry key all day: if LINE accepted a request whose response was lost, the retry gets 409 instead of a duplicate post.
-          const response = await fetch('https://api.line.me/v2/bot/message/push', { method: 'POST',
-            headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, 'X-Line-Retry-Key': s.retryKey },
-            body: JSON.stringify({ to: groupId, messages: [{ type: 'text', text: await lineBody(db, lives, slot === 'day' ? settings.dayMode : settings.nightMode) }] }) });
+          const post = (msg, key) => fetch('https://api.line.me/v2/bot/message/push', { method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token, 'X-Line-Retry-Key': key },
+            body: JSON.stringify({ to: groupId, messages: [msg] }) });
+          let response = await post(message, s.retryKey);
+          if (message.type === 'textV2' && response.status === 400) {
+            // e.g. a linked member left the group: still deliver the list, without mentions.
+            s.plainKey = s.plainKey || uuid(); s.mentionError = true;
+            response = await post(plain, s.plainKey);
+          }
           s.sent = response.status === 200 || response.status === 409; s.lastStatus = 'HTTP ' + response.status;
         } catch { s.lastStatus = 'network-error'; }
         state[slot] = s; await putSetting(db, 'line_state', JSON.stringify(state)).run();
@@ -683,12 +724,75 @@ async function lineWebhook(request, env) {
   for (let i = 0; i < Math.max(expected.length, received.length); i++) diff |= (expected.charCodeAt(i) || 0) ^ (received.charCodeAt(i) || 0);
   if (diff !== 0) return new Response('Invalid signature', { status: 401 });
   let payload; try { payload = JSON.parse(raw); } catch { return new Response('Invalid JSON', { status: 400 }); }
-  const joined = (Array.isArray(payload.events) ? payload.events : []).find(e => e?.type === 'join' && e.source?.type === 'group' && typeof e.source.groupId === 'string' && /^[A-Za-z0-9_-]{1,200}$/.test(e.source.groupId));
-  if (!joined) return new Response('OK');
+  const events = Array.isArray(payload.events) ? payload.events : [];
+  const joined = events.find(e => e?.type === 'join' && e.source?.type === 'group' && typeof e.source.groupId === 'string' && /^[A-Za-z0-9_-]{1,200}$/.test(e.source.groupId));
+  const linkRequests = events.filter(e => e?.type === 'message' && e.message?.type === 'text' && typeof e.replyToken === 'string' && LINE_LINK_TEXT.test(String(e.message.text || '').normalize('NFKC')));
+  if (!joined && !linkRequests.length) return new Response('OK');
   await ensureSchema(env);
   // The first group the bot joins becomes the fixed destination.
-  await env.DB.prepare("INSERT OR IGNORE INTO settings(key, value) VALUES('line_group_id', ?)").bind(joined.source.groupId).run();
+  if (joined) await env.DB.prepare("INSERT OR IGNORE INTO settings(key, value) VALUES('line_group_id', ?)").bind(joined.source.groupId).run();
+  for (const e of linkRequests.slice(0, 10)) await linkLineAccount(env, e);
   return new Response('OK');
+}
+
+/* ---------- LINE account link (for mentions in the 21:00 reminder) ---------- */
+// A member opens "LINE連携" in the app, gets a 6-digit code, and posts "連携 123456" in the LINE group.
+const LINE_LINK_TEXT = /^\s*(?:チケマネ\s*)?連携\s*(\d{6})\s*$/;
+const LINE_CODE_MINUTES = 30;
+async function lineReply(env, replyToken, text) {
+  const token = String(env.LINE_CHANNEL_ACCESS_TOKEN || '').trim();
+  if (!token) return;
+  try {
+    await fetch('https://api.line.me/v2/bot/message/reply', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+      body: JSON.stringify({ replyToken, messages: [{ type: 'text', text }] }) });
+  } catch { /* the reply is a courtesy; the link itself is already saved */ }
+}
+async function linkLineAccount(env, event, now = Date.now()) {
+  const db = env.DB, source = event.source || {}, userId = String(source.userId || '');
+  const groupId = String(env.LINE_GROUP_ID || (await getSettings(db, ['line_group_id'])).line_group_id || '').trim();
+  // Only the notification group (or a 1:1 chat with the bot) can link; other groups are ignored silently.
+  if (source.type === 'group' ? !groupId || source.groupId !== groupId : source.type !== 'user') return;
+  if (!/^U[0-9a-f]{32}$/.test(userId)) return lineReply(env, event.replyToken, 'LINEのアカウント情報を受け取れませんでした。スマホのLINEアプリから送ってください。');
+  const fail = await first(db, 'SELECT count, window_start FROM line_link_failures WHERE user_id = ?', userId);
+  const recent = fail && now - fail.window_start < 3600000 ? fail.count : 0;
+  if (recent >= 5) return lineReply(env, event.replyToken, '連携コードの入力に何度も失敗したため、1時間ほど待ってからもう一度お試しください。');
+  const code = LINE_LINK_TEXT.exec(String(event.message.text).normalize('NFKC'))[1];
+  const row = await first(db, 'SELECT c.member_id, c.expires_at, m.name, m.active FROM line_link_codes c JOIN members m ON m.id = c.member_id WHERE c.code = ?', code);
+  if (!row || row.expires_at < now || row.active !== 1) {
+    await db.prepare('INSERT INTO line_link_failures(user_id, count, window_start) VALUES(?, 1, ?) ON CONFLICT(user_id) DO UPDATE SET count = ?, window_start = ?')
+      .bind(userId, now, recent + 1, recent ? fail.window_start : now).run();
+    return lineReply(env, event.replyToken, '連携コードが正しくないか、期限切れです。チケマネの「LINE連携」で表示されているコードを確認してください。');
+  }
+  await db.batch([
+    db.prepare('DELETE FROM line_links WHERE member_id = ? OR user_id = ?').bind(row.member_id, userId),
+    db.prepare('INSERT INTO line_links(member_id, user_id, linked_at) VALUES(?, ?, ?)').bind(row.member_id, userId, new Date(now).toISOString()),
+    db.prepare('DELETE FROM line_link_codes WHERE member_id = ?').bind(row.member_id),
+    db.prepare('DELETE FROM line_link_failures WHERE user_id = ?').bind(userId),
+  ]);
+  return lineReply(env, event.replyToken, row.name + 'さんのLINEを連携しました ✓\n21時の通知で、申込状況が未確認のイベントがあるときにメンションします。');
+}
+async function getLineLink({ db, env, me }, memberId, unlink) {
+  sameMember(me, memberId);
+  const settings = await getSettings(db, ['line_group_id']);
+  const configured = !!(String(env.LINE_CHANNEL_ACCESS_TOKEN || '').trim() && String(env.LINE_GROUP_ID || settings.line_group_id || '').trim());
+  if (unlink === true) await db.prepare('DELETE FROM line_links WHERE member_id = ?').bind(me.id).run();
+  const linked = await first(db, 'SELECT linked_at FROM line_links WHERE member_id = ?', me.id);
+  if (linked) return { configured, linked: true, linkedAt: linked.linked_at };
+  const now = Date.now();
+  let code = await first(db, 'SELECT code, expires_at FROM line_link_codes WHERE member_id = ? AND expires_at > ?', me.id, now + 5 * 60000);
+  if (!code) {
+    const expires = now + LINE_CODE_MINUTES * 60000;
+    for (let i = 0; i < 5 && !code; i++) {
+      const candidate = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
+      try {
+        await db.batch([db.prepare('DELETE FROM line_link_codes WHERE member_id = ? OR expires_at < ?').bind(me.id, now),
+          db.prepare('INSERT INTO line_link_codes(code, member_id, expires_at) VALUES(?, ?, ?)').bind(candidate, me.id, expires)]);
+        code = { code: candidate, expires_at: expires };
+      } catch (e) { if (!/UNIQUE|PRIMARY/i.test(String(e?.message))) throw e; }
+    }
+    if (!code) throw new AppError('連携コードを作れませんでした。もう一度お試しください', 503);
+  }
+  return { configured, linked: false, code: code.code, expiresAt: new Date(code.expires_at).toISOString() };
 }
 
 /* ---------- iPhone widgets (Scriptable) ---------- */
@@ -749,6 +853,8 @@ const METHODS = {
   saveData, getAdminSettings, saveAdminSettings, getPushSettings, savePushSubscription, removePushSubscription, testPushSubscription,
   listMembers, saveMember, registerMember, importData,
   getWidgetKey: (ctx, memberId) => getWidgetKey(ctx, memberId, false),
+  getLineLink: (ctx, memberId) => getLineLink(ctx, memberId, false),
+  unlinkLine: (ctx, memberId) => getLineLink(ctx, memberId, true),
   resetWidgetKey: (ctx, memberId) => getWidgetKey(ctx, memberId, true),
 };
 function corsHeaders(request, env) {

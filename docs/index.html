@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js">
-<link rel="stylesheet" href="./styles.css?v=20261116"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
+<link rel="stylesheet" href="./styles.css?v=20261116b"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
   <div class="startup-content"><div class="startup-mark"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#12233f"/><defs><mask id="startup-hole"><rect x="-400" y="-400" width="800" height="800" fill="#fff"/><polygon points="-49.5,-54.0 -35.4,-15.4 5.7,-13.9 -26.7,11.4 -15.4,50.9 -49.5,28.0 -83.6,50.9 -72.3,11.4 -104.7,-13.9 -63.6,-15.4" fill="#000"/></mask></defs><g transform="translate(244 262) scale(1.04) rotate(-12)"><path class="ticket" d="M-145.0,-95.0 H61.0 A22,22 0 0 1 83.0,-73.0 V73.0 A22,22 0 0 1 61.0,95.0 H-145.0 A22,22 0 0 1 -167.0,73.0 V26.0 A26,26 0 0 0 -167.0,-26.0 V-73.0 A22,22 0 0 1 -145.0,-95.0 Z" fill="#ffffff" mask="url(#startup-hole)"/><circle cx="83.0" cy="-77.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="0.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="77.0" r="6.5" fill="#12233f"/><g class="stub-tear"><g class="stub" transform="translate(99.0 8) rotate(11 0 95.0)"><path d="M22,-95.0 H74 A22,22 0 0 1 96,-73.0 V-26.0 A26,26 0 0 0 96,26.0 V73.0 A22,22 0 0 1 74,95.0 H22 A22,22 0 0 1 0,73.0 V-73.0 A22,22 0 0 1 22,-95.0 Z" fill="#ff5b45"/></g></g></g></svg></div><strong class="startup-title">Ticket Management</strong></div>
 </div>
 <script id="startup-once">try{var d=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});if(localStorage.getItem('ticket-startup-day')===d)document.getElementById('startup-screen').remove();else localStorage.setItem('ticket-startup-day',d)}catch(e){}</script>
@@ -453,7 +453,7 @@ function permissionInfo(){
   const role=admin?'管理者':'メンバー';
   const body=`<p><strong>現在の権限：${role}</strong></p>
   <h3>全メンバー共通</h3>
-  <ul><li>イベント一覧の閲覧、新規登録・編集・削除（すべてのイベント）</li><li>自分の参戦予定・締切日の申込状況の変更</li><li>自分のチケット番号・状態・URLの登録、編集、削除</li><li>全員の参戦状況や、共有対象のチケット番号・余り情報の閲覧</li><li>自分の端末の通知設定${usesCloudflare()?'・iPhoneウィジェットの設定':''}</li></ul>
+  <ul><li>イベント一覧の閲覧、新規登録・編集・削除（すべてのイベント）</li><li>自分の参戦予定・締切日の申込状況の変更</li><li>自分のチケット番号・状態・URLの登録、編集、削除</li><li>全員の参戦状況や、共有対象のチケット番号・余り情報の閲覧</li><li>自分の端末の通知設定${usesCloudflare()?'・iPhoneウィジェットとLINE連携の設定':''}</li></ul>
   <h3>管理者だけ</h3>
   <p>${usesCloudflare()?'メンバーの登録・権限変更・利用停止、LINE配信時刻と昼夜の通知内容の変更ができます。':'LINE配信時刻と昼夜の通知内容を変更できます。'}</p>
   <p class="muted">管理者でも、他のメンバーのチケット情報は編集できません。${usesCloudflare()?'メンバーはアカウントメニューの「メンバー管理」で登録します。':'メンバーの登録・権限変更は管理スプレッドシートの Members シートで行います。'}</p>`;
@@ -533,7 +533,7 @@ function applyTheme(mode){
 }
 function accountMenu(){
   const name=esc(data.me.name),admin=data.me.isAdmin,role=admin?'管理者':'メンバー';
-  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${isIosHomeScreenApp()?'<button type="button" id="link-browser">リンクを開くブラウザ</button>':''}${usesCloudflare()?'<button type="button" id="widget-settings">iPhoneウィジェット</button>':''}${admin&&usesCloudflare()?'<button type="button" id="member-admin">メンバー管理</button>':''}${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><p class="theme-switch-label" id="theme-label">表示</p><div class="theme-switch" role="group" aria-labelledby="theme-label">${[['auto','自動'],['light','ライト'],['dark','ダーク']].map(([v,l])=>`<button type="button" data-theme-mode="${v}" aria-pressed="${themeMode()===v}">${l}</button>`).join('')}</div><button type="button" id="logout">ログアウト</button></div></details>`;
+  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${isIosHomeScreenApp()?'<button type="button" id="link-browser">リンクを開くブラウザ</button>':''}${usesCloudflare()?'<button type="button" id="line-link">LINE連携</button><button type="button" id="widget-settings">iPhoneウィジェット</button>':''}${admin&&usesCloudflare()?'<button type="button" id="member-admin">メンバー管理</button>':''}${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><p class="theme-switch-label" id="theme-label">表示</p><div class="theme-switch" role="group" aria-labelledby="theme-label">${[['auto','自動'],['light','ライト'],['dark','ダーク']].map(([v,l])=>`<button type="button" data-theme-mode="${v}" aria-pressed="${themeMode()===v}">${l}</button>`).join('')}</div><button type="button" id="logout">ログアウト</button></div></details>`;
 }
 function renderHome(){if(!data)return;const today=japanDay();lastDay=today;const todayPending=(data.lives||[]).filter(l=>!l.archived&&l.lotteryDeadline===today&&myApplicationStatus(l)==='未確認').length;const lives=sortedEvents(data.lives.filter(l=>archiveView?l.archived===true:(l.date>=today&&!l.archived)),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
 $('account').innerHTML=accountMenu();
@@ -559,6 +559,7 @@ if($('line-admin-settings'))$('line-admin-settings').onclick=()=>{closeAccount()
 if($('member-admin'))$('member-admin').onclick=()=>{closeAccount();memberAdmin()};
 $('permissions-help').onclick=()=>{closeAccount();permissionInfo()};
 if($('widget-settings'))$('widget-settings').onclick=()=>{closeAccount();widgetSettings()};
+if($('line-link'))$('line-link').onclick=()=>{closeAccount();lineLinkSettings()};
 if($('link-browser'))$('link-browser').onclick=()=>{closeAccount();linkBrowserSettings()};
 document.querySelectorAll('[data-theme-mode]').forEach(b=>b.onclick=()=>applyTheme(b.dataset.themeMode));
 document.querySelectorAll('[data-my-filter]').forEach(b=>b.onclick=()=>{myFilter=b.dataset.myFilter;document.querySelectorAll('[data-my-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.myFilter===myFilter)));drawTiles(lives,today)});
@@ -771,6 +772,35 @@ const LINK_BROWSERS=[
 ];
 const linkBrowser=()=>{try{const v=localStorage.getItem('ticket-link-browser');return LINK_BROWSERS.some(b=>b[0]===v)?v:'safari'}catch(e){return 'safari'}};
 function sendToBrowser(url){const b=LINK_BROWSERS.find(x=>x[0]===linkBrowser());if(b&&b[2])location.href=b[2](url)}
+// LINE連携: post the code in the LINE group once, then the 21:00 reminder mentions you while you are 未確認.
+async function lineLinkSettings(){
+  managerLiveId='';managerMode='';
+  modal('LINE連携','<p id="line-link-body" class="muted" role="status">確認しています…</p>',()=>{});
+  $('submit-save').hidden=true;
+  const hhmm=iso=>{const d=new Date(iso);return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')};
+  const show=async(action='getLineLink')=>{
+    const host=$('line-link-body');if(!host)return;
+    let state;try{state=await rpc(action,memberId)}catch(e){host.textContent=/未対応/.test(e.message||'')?'サーバー側の準備がまだです。管理者に連絡してください':e.message||'読み込めませんでした';return}
+    if(!$('line-link-body'))return;
+    const box=document.createElement('div');box.id='line-link-body';box.className='line-link';
+    if(!state.configured){box.innerHTML='<p>LINEグループへの通知が設定されていないため、まだ使えません。管理者に連絡してください。</p>'}
+    else if(state.linked){
+      box.innerHTML=`<p class="line-link-done">✓ LINEと連携しています</p><p>21時の通知で、申込状況が未確認のイベントがあるときに、あなたにメンションが届きます。</p><p class="muted">連携した日：${esc(new Date(state.linkedAt).toLocaleDateString('ja-JP'))}<br>別のLINEアカウントに変えるときは、いったん解除してからもう一度連携してください。</p><button type="button" id="line-unlink" class="danger">連携を解除</button>`;
+    }else{
+      const text='連携 '+state.code;
+      box.innerHTML=`<p>21時の通知で、申込状況が未確認のときにあなたへメンションが届くようになります。</p>
+      <ol class="admin-steps"><li>下の<b>コピー</b>を押します。</li><li>通知が届いている<b>LINEグループ</b>に貼り付けて送ります。</li><li>ボットから「連携しました」と返信が来たら完了です。</li></ol>
+      <div class="line-code"><code>${esc(text)}</code><button type="button" class="primary" id="line-code-copy">コピー</button></div>
+      <p class="muted">このコードは${esc(hhmm(state.expiresAt))}まで使えます。人に送らないでください。</p>
+      <button type="button" id="line-link-check">連携できたか確認する</button>`;
+    }
+    host.replaceWith(box);
+    if($('line-code-copy'))$('line-code-copy').onclick=async()=>{const b=$('line-code-copy');try{await navigator.clipboard.writeText('連携 '+state.code);b.textContent='コピーしました'}catch(e){b.textContent='長押しでコピーしてください'}};
+    if($('line-link-check'))$('line-link-check').onclick=()=>{$('line-link-body').replaceWith(Object.assign(document.createElement('p'),{id:'line-link-body',className:'muted',textContent:'確認しています…'}));show()};
+    if($('line-unlink'))$('line-unlink').onclick=()=>{if(!confirm('LINE連携を解除しますか？21時の通知でメンションされなくなります'))return;$('line-link-body').replaceWith(Object.assign(document.createElement('p'),{id:'line-link-body',className:'muted',textContent:'解除しています…'}));show('unlinkLine')};
+  };
+  show();
+}
 function linkBrowserSettings(){
   managerLiveId='';managerMode='';
   const now=linkBrowser();
