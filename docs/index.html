@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js">
 <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js">
-<link rel="stylesheet" href="./styles.css?v=20261112b"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
+<link rel="stylesheet" href="./styles.css?v=20261116"></head><body><div id="startup-screen" class="startup-screen" role="status" aria-label="読み込み中">
   <div class="startup-content"><div class="startup-mark"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#12233f"/><defs><mask id="startup-hole"><rect x="-400" y="-400" width="800" height="800" fill="#fff"/><polygon points="-49.5,-54.0 -35.4,-15.4 5.7,-13.9 -26.7,11.4 -15.4,50.9 -49.5,28.0 -83.6,50.9 -72.3,11.4 -104.7,-13.9 -63.6,-15.4" fill="#000"/></mask></defs><g transform="translate(244 262) scale(1.04) rotate(-12)"><path class="ticket" d="M-145.0,-95.0 H61.0 A22,22 0 0 1 83.0,-73.0 V73.0 A22,22 0 0 1 61.0,95.0 H-145.0 A22,22 0 0 1 -167.0,73.0 V26.0 A26,26 0 0 0 -167.0,-26.0 V-73.0 A22,22 0 0 1 -145.0,-95.0 Z" fill="#ffffff" mask="url(#startup-hole)"/><circle cx="83.0" cy="-77.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="-25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="0.0" r="6.5" fill="#12233f"/><circle cx="83.0" cy="25.7" r="6.5" fill="#12233f"/><circle cx="83.0" cy="51.3" r="6.5" fill="#12233f"/><circle cx="83.0" cy="77.0" r="6.5" fill="#12233f"/><g class="stub-tear"><g class="stub" transform="translate(99.0 8) rotate(11 0 95.0)"><path d="M22,-95.0 H74 A22,22 0 0 1 96,-73.0 V-26.0 A26,26 0 0 0 96,26.0 V73.0 A22,22 0 0 1 74,95.0 H22 A22,22 0 0 1 0,73.0 V-73.0 A22,22 0 0 1 22,-95.0 Z" fill="#ff5b45"/></g></g></g></svg></div><strong class="startup-title">Ticket Management</strong></div>
 </div>
 <script id="startup-once">try{var d=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Tokyo'});if(localStorage.getItem('ticket-startup-day')===d)document.getElementById('startup-screen').remove();else localStorage.setItem('ticket-startup-day',d)}catch(e){}</script>
@@ -533,7 +533,7 @@ function applyTheme(mode){
 }
 function accountMenu(){
   const name=esc(data.me.name),admin=data.me.isAdmin,role=admin?'管理者':'メンバー';
-  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${usesCloudflare()?'<button type="button" id="widget-settings">iPhoneウィジェット</button>':''}${admin&&usesCloudflare()?'<button type="button" id="member-admin">メンバー管理</button>':''}${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><p class="theme-switch-label" id="theme-label">表示</p><div class="theme-switch" role="group" aria-labelledby="theme-label">${[['auto','自動'],['light','ライト'],['dark','ダーク']].map(([v,l])=>`<button type="button" data-theme-mode="${v}" aria-pressed="${themeMode()===v}">${l}</button>`).join('')}</div><button type="button" id="logout">ログアウト</button></div></details>`;
+  return `<details class="account-menu"><summary class="account-trigger" aria-label="アカウントメニュー：${name}（${role}）"><span class="avatar" aria-hidden="true">${esc(String(data.me.name||'?').slice(0,1))}</span><span class="account-name">${name}</span><span class="account-caret" aria-hidden="true"></span></summary><div class="account-panel"><p class="account-meta"><span class="account-name">${name}</span><span class="role-badge">${role}</span></p><button type="button" id="notification-settings">通知設定</button>${isIosHomeScreenApp()?'<button type="button" id="link-browser">リンクを開くブラウザ</button>':''}${usesCloudflare()?'<button type="button" id="widget-settings">iPhoneウィジェット</button>':''}${admin&&usesCloudflare()?'<button type="button" id="member-admin">メンバー管理</button>':''}${admin?'<button type="button" id="line-admin-settings">LINE配信設定</button>':''}<button type="button" id="permissions-help">権限・できること</button><p class="theme-switch-label" id="theme-label">表示</p><div class="theme-switch" role="group" aria-labelledby="theme-label">${[['auto','自動'],['light','ライト'],['dark','ダーク']].map(([v,l])=>`<button type="button" data-theme-mode="${v}" aria-pressed="${themeMode()===v}">${l}</button>`).join('')}</div><button type="button" id="logout">ログアウト</button></div></details>`;
 }
 function renderHome(){if(!data)return;const today=japanDay();lastDay=today;const todayPending=(data.lives||[]).filter(l=>!l.archived&&l.lotteryDeadline===today&&myApplicationStatus(l)==='未確認').length;const lives=sortedEvents(data.lives.filter(l=>archiveView?l.archived===true:(l.date>=today&&!l.archived)),today);if(selected&&!lives.some(x=>x.id===selected))selected='';const groups=[...new Set(lives.flatMap(l=>l.groups||[]))].sort((a,b)=>a.localeCompare(b,'ja'));if(groupFilter&&!groups.includes(groupFilter))groupFilter='';
 $('account').innerHTML=accountMenu();
@@ -559,6 +559,7 @@ if($('line-admin-settings'))$('line-admin-settings').onclick=()=>{closeAccount()
 if($('member-admin'))$('member-admin').onclick=()=>{closeAccount();memberAdmin()};
 $('permissions-help').onclick=()=>{closeAccount();permissionInfo()};
 if($('widget-settings'))$('widget-settings').onclick=()=>{closeAccount();widgetSettings()};
+if($('link-browser'))$('link-browser').onclick=()=>{closeAccount();linkBrowserSettings()};
 document.querySelectorAll('[data-theme-mode]').forEach(b=>b.onclick=()=>applyTheme(b.dataset.themeMode));
 document.querySelectorAll('[data-my-filter]').forEach(b=>b.onclick=()=>{myFilter=b.dataset.myFilter;document.querySelectorAll('[data-my-filter]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.myFilter===myFilter)));drawTiles(lives,today)});
 $('my-surplus-list').onclick=personalSurplusList;$('reload').onclick=refresh;$('new-live').onclick=()=>liveForm();
@@ -757,18 +758,35 @@ function showSetup(){ $('account').textContent='';$('app').innerHTML='<div class
 window.addEventListener('popstate',handleHistory);
 document.addEventListener('click',e=>{document.querySelectorAll('details.ev-more[open],details.account-menu[open]').forEach(d=>{if(!d.contains(e.target))d.open=false})});
 // iPhone home-screen app: outside links (チケットURL, 地図, スプシ) would open in the app's built-in viewer.
-// Hand them to Safari instead (x-safari-https: works on iOS 17+); if Safari does not take over, fall back to a normal new window.
+// Hand them to the member's browser instead (x-safari-https:, googlechromes:, ...); if it does not take over, fall back to a normal new window.
 const isIosHomeScreenApp=()=>{const ua=navigator.userAgent,v=/OS (\d+)_/.exec(ua);return /iP(hone|ad|od)/.test(ua)&&v&&Number(v[1])>=17&&(navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)};
-function sendToSafari(url){location.href='x-safari-'+url}
+// iOS has no "open in the default browser" link for web apps, so each member picks their browser once.
+const LINK_BROWSERS=[
+  ['safari','Safari',u=>'x-safari-'+u],
+  ['chrome','Chrome',u=>u.replace(/^https:/,'googlechromes:').replace(/^http:/,'googlechrome:')],
+  ['edge','Microsoft Edge',u=>'microsoft-edge-'+u],
+  ['firefox','Firefox',u=>'firefox://open-url?url='+encodeURIComponent(u)],
+  ['brave','Brave',u=>'brave://open-url?url='+encodeURIComponent(u)],
+  ['inapp','切り替えない（アプリの中で開く）',null],
+];
+const linkBrowser=()=>{try{const v=localStorage.getItem('ticket-link-browser');return LINK_BROWSERS.some(b=>b[0]===v)?v:'safari'}catch(e){return 'safari'}};
+function sendToBrowser(url){const b=LINK_BROWSERS.find(x=>x[0]===linkBrowser());if(b&&b[2])location.href=b[2](url)}
+function linkBrowserSettings(){
+  managerLiveId='';managerMode='';
+  const now=linkBrowser();
+  modal('リンクを開くブラウザ',`<p>チケットURLや地図などのリンクを、どのブラウザで開くかを選べます。いつも使っているブラウザ（標準のブラウザ）を選んでください。</p>
+  <fieldset class="browser-choice"><legend class="sr-only">ブラウザ</legend>${LINK_BROWSERS.map(([id,label])=>`<label><input type="radio" name="browser" value="${id}" ${id===now?'checked':''}> ${label}</label>`).join('')}</fieldset>
+  <p class="muted">選んだブラウザがiPhoneに入っていないときは、アプリの中で開きます。この設定はこのiPhoneのチケマネだけに保存されます。</p>`,f=>{try{localStorage.setItem('ticket-link-browser',f.browser||'safari')}catch(e){}modalDirty=false;closeModal();notice('保存しました')});
+}
 document.addEventListener('click',e=>{
   const a=e.target.closest&&e.target.closest('a[target="_blank"][href^="http"]');
-  if(!a||e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||!isIosHomeScreenApp())return;
+  if(!a||e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||!isIosHomeScreenApp()||linkBrowser()==='inapp')return;
   let url;try{url=new URL(a.href)}catch(err){return}
   if(url.origin===location.origin)return;
   e.preventDefault();
   let left=false;const away=()=>{if(document.visibilityState==='hidden')left=true};
   document.addEventListener('visibilitychange',away);
-  sendToSafari(url.href);
+  sendToBrowser(url.href);
   setTimeout(()=>{document.removeEventListener('visibilitychange',away);if(!left&&document.visibilityState==='visible')window.open(url.href,'_blank','noopener')},900);
 });
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const open=document.querySelector('details.ev-more[open],details.account-menu[open]');if(open){open.open=false;open.querySelector('summary').focus()}});
