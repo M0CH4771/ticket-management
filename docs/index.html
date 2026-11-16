@@ -756,6 +756,21 @@ function ticketForm(t){if(busy||!t||t.memberId!==data.me.id||ticketPending(t))re
 function showSetup(){ $('account').textContent='';$('app').innerHTML='<div class="card login"><img class="login-mark" src="./icons/favicon.svg?v=4" alt=""><h1>初期設定を準備中です</h1><p>イベント・チケットの保存先を接続すると利用できます。</p><p class="muted">幹事の方は設定手順に沿ってGASを公開し、そのURLを設定してください。メンバーの方の設定は不要です。</p><a href="https://github.com/M0CH4771/ticket-management#最初の設定" target="_blank" rel="noopener">設定手順を見る ↗</a></div>';finishStartup()}
 window.addEventListener('popstate',handleHistory);
 document.addEventListener('click',e=>{document.querySelectorAll('details.ev-more[open],details.account-menu[open]').forEach(d=>{if(!d.contains(e.target))d.open=false})});
+// iPhone home-screen app: outside links (チケットURL, 地図, スプシ) would open in the app's built-in viewer.
+// Hand them to Safari instead (x-safari-https: works on iOS 17+); if Safari does not take over, fall back to a normal new window.
+const isIosHomeScreenApp=()=>{const ua=navigator.userAgent,v=/OS (\d+)_/.exec(ua);return /iP(hone|ad|od)/.test(ua)&&v&&Number(v[1])>=17&&(navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)};
+function sendToSafari(url){location.href='x-safari-'+url}
+document.addEventListener('click',e=>{
+  const a=e.target.closest&&e.target.closest('a[target="_blank"][href^="http"]');
+  if(!a||e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||!isIosHomeScreenApp())return;
+  let url;try{url=new URL(a.href)}catch(err){return}
+  if(url.origin===location.origin)return;
+  e.preventDefault();
+  let left=false;const away=()=>{if(document.visibilityState==='hidden')left=true};
+  document.addEventListener('visibilitychange',away);
+  sendToSafari(url.href);
+  setTimeout(()=>{document.removeEventListener('visibilitychange',away);if(!left&&document.visibilityState==='visible')window.open(url.href,'_blank','noopener')},900);
+});
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const open=document.querySelector('details.ev-more[open],details.account-menu[open]');if(open){open.open=false;open.querySelector('summary').focus()}});
 history.replaceState({ticketView:'home'},'',location.pathname+location.search);
 if(!apiEndpoint())showSetup();else startApp();
