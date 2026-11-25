@@ -283,6 +283,7 @@ async function lineHook(body, secret = 'line-secret') {
   const message = JSON.parse(first[0].init.body);
   assert.equal(message.to, 'Cgroup1');
   assert.match(message.messages[0].text, /本日締切の公演/); assert.match(message.messages[0].text, /枠数：2枚/);
+  assert.match(message.messages[0].text, /出演グループ：グループA/);
   await __test.sendDeadlineNotifications(env, noon); // waits 15 minutes before retrying
   assert.equal(outbound.filter(r => r.url.includes('line.me')).length, 1);
   lineStatus = 409; // LINE already accepted the earlier request
@@ -320,6 +321,10 @@ async function lineHook(body, secret = 'line-secret') {
   assert.match(replies().at(-1), /1時間ほど待って/, 'repeated wrong codes are throttled');
 
   // 21:00 again (new day state): Alice is mentioned, Bob (not linked) stays plain text. 12:00 never mentions.
+  await call('admin@example.com', 'saveMember', { ...alice, groups: ['グループA', 'グループC'] });
+  await call('admin@example.com', 'saveMember', { ...bob, groups: ['グループB'] });
+  assert.deepEqual((await call('admin@example.com', 'listMembers')).find(m => m.id === A).groups, ['グループA', 'グループC']);
+  env.DB.raw.prepare('INSERT INTO line_links(member_id, user_id, linked_at) VALUES(?, ?, ?)').run(B, U_BOB, new Date().toISOString());
   env.DB.raw.prepare("DELETE FROM settings WHERE key = 'line_state'").run();
   outbound.length = 0;
   await __test.sendDeadlineNotifications(env, new Date(today + 'T12:06:00+09:00'));
@@ -347,7 +352,7 @@ async function lineHook(body, secret = 'line-secret') {
   await __test.sendDeadlineNotifications(env, new Date(today + 'T21:08:00+09:00'));
   const braces = JSON.parse(outbound.find(r => r.url.endsWith('/push')).init.body).messages[0];
   assert.match(braces.text, /イベント名：｛m1｝ 企画/); assert.match(braces.text, /example\.com\/a%7Bb%7D/);
-  assert.equal(Object.keys(braces.substitution).length, 2, 'Alice mentioned once per event');
+  assert.equal(Object.keys(braces.substitution).length, 1, 'no mention for an event without groups or for a nonmatching linked member');
   // Unlink: back to plain names.
   assert.equal((await call('alice@example.com', 'unlinkLine', A)).linked, false);
   env.DB.raw.prepare("DELETE FROM settings WHERE key = 'line_state'").run();
