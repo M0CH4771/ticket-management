@@ -18,6 +18,7 @@
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE, role TEXT NOT NULL DEFAULT 'member', active INTEGER NOT NULL DEFAULT 1, created_at TEXT);
+CREATE TABLE IF NOT EXISTS member_groups (member_id TEXT PRIMARY KEY, groups TEXT NOT NULL DEFAULT '[]');
 CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, title TEXT NOT NULL, date TEXT NOT NULL, venue TEXT NOT NULL DEFAULT '', sheet_url TEXT NOT NULL DEFAULT '', memo TEXT NOT NULL DEFAULT '', owner TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1, lottery_deadline TEXT NOT NULL DEFAULT '', required_throws TEXT NOT NULL DEFAULT '', purchase_url TEXT NOT NULL DEFAULT '', groups TEXT NOT NULL DEFAULT '[]', archived INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, event_id TEXT NOT NULL, member_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT '', applied TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1, UNIQUE(event_id, member_id));
 CREATE TABLE IF NOT EXISTS tickets (id TEXT PRIMARY KEY, event_id TEXT NOT NULL, member_id TEXT NOT NULL, number TEXT NOT NULL DEFAULT '', number_key TEXT NOT NULL DEFAULT '', status TEXT NOT NULL, recipient TEXT NOT NULL DEFAULT '', memo TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1, ticket_url TEXT NOT NULL DEFAULT '');
@@ -364,8 +365,8 @@ async function saveData(ctx, memberId, action, payload, options) {
 /* ---------- admin: members, LINE settings, import ---------- */
 async function listMembers({ db, me }) {
   requireAdmin(me);
-  return (await all(db, 'SELECT id, name, email, role, active FROM members ORDER BY active DESC, created_at, name'))
-    .map(m => ({ id: m.id, name: m.name, email: m.email || '', role: m.role, active: m.active === 1, isMe: m.id === me.id }));
+  return (await all(db, 'SELECT m.*, g.groups FROM members m LEFT JOIN member_groups g ON g.member_id = m.id ORDER BY m.active DESC, m.created_at, m.name'))
+    .map(m => ({ id: m.id, name: m.name, email: m.email || '', role: m.role, active: m.active === 1, isMe: m.id === me.id, groups: readGroups(m.groups) }));
 }
 async function saveMember({ db, me, env }, input) {
   requireAdmin(me, 'メンバー登録は管理者のみ実行できます');
@@ -382,10 +383,12 @@ async function saveMember({ db, me, env }, input) {
   if (others.some(o => o.email === email)) throw new AppError('このGoogleアカウントは登録済みです', 409);
   if (old?.id === me.id && (role !== 'admin' || !active) && !adminEmails(env).has(email)) throw new AppError('自分自身の管理者権限・利用状態は変更できません');
   const id = old ? old.id : uuid();
+  const groups = m.groups === undefined ? readGroups((await first(db, 'SELECT groups FROM member_groups WHERE member_id = ?', id))?.groups) : validateGroups(m.groups);
   await commit(db, [db.prepare(`INSERT INTO members(id, name, email, role, active, created_at) VALUES(?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET name = excluded.name, email = excluded.email, role = excluded.role, active = excluded.active`)
-    .bind(id, name, email, role, active, old?.created_at || new Date().toISOString())]);
-  return { id, name, email, role, active: active === 1 };
+    .bind(id, name, email, role, active, old?.created_at || new Date().toISOString()),
+    db.prepare('INSERT INTO member_groups(member_id, groups) VALUES(?, ?) ON CONFLICT(member_id) DO UPDATE SET groups = excluded.groups').bind(id, JSON.stringify(groups))]);
+  return { id, name, email, role, active: active === 1, groups };
 }
 // Old GAS-compatible call kept for any cached page that still uses it.
 const registerMember = (ctx, name, email) => saveMember(ctx, { name, email, role: 'member' }).then(m => ({ id: m.id, name: m.name }));
@@ -587,14 +590,16 @@ const v2Safe = s => String(s).replace(/\{/g, '｛').replace(/\}/g, '｝');
 const v2Url = s => String(s).replace(/\{/g, '%7B').replace(/\}/g, '%7D');
 const lineEventLines = (l, v2 = false) => {
   const t = v2 ? v2Safe : String, u = v2 ? v2Url : String;
-  return ['', '開催日：' + slash(l.date), 'イベント名：' + t(l.title), 'チケットURL：' + (l.purchase_url ? u(l.purchase_url) : '未登録'), '枠数：' + (l.required_throws !== '' ? t(l.required_throws) + '枚' : '未設定')];
+  return ['', '開催日：' + slash(l.date), 'イベント名：' + t(l.title), '出演グループ：' + (readGroups(l.groups).map(t).join('、') || '未登録'), 'チケットURL：' + (l.purchase_url ? u(l.purchase_url) : '未登録'), '枠数：' + (l.required_throws !== '' ? t(l.required_throws) + '枚' : '未設定')];
 };
 const LINE_MENTION_MAX = 100;
 // mentions (Map memberId -> LINE userId) turns linked members' names into mentions and returns a textV2 message.
 async function lineBody(db, events, mode, mentions = null) {
   const v2 = !!mentions, substitution = {}; let mentioned = 0;
-  const nameOf = m => {
-    const userId = v2 ? mentions.get(m.id) : '';
+  const nameOf = (m, live) => {
+    const eventGroups = new Set(readGroups(live.groups).map(normalizedName));
+    const matches = readGroups(m.groups).some(g => eventGroups.has(normalizedName(g)));
+    const userId = v2 && matches ? mentions.get(m.id) : '';
     if (!userId || mentioned >= LINE_MENTION_MAX) return v2 ? v2Safe(m.name) : m.name;
     const key = 'm' + (++mentioned);
     substitution[key] = { type: 'mention', mentionee: { type: 'user', userId } };
@@ -604,7 +609,7 @@ async function lineBody(db, events, mode, mentions = null) {
   const lines = ['【本日締切】']; let included = 0;
   const add = (block, total) => { if (lines.join('\n').length + block.length > 4500) return false; lines.push(block); included++; return true; };
   if (mode === 'unconfirmed') {
-    const members = await all(db, 'SELECT id, name FROM members WHERE active = 1 ORDER BY created_at, name');
+    const members = await all(db, 'SELECT m.id, m.name, g.groups FROM members m LEFT JOIN member_groups g ON g.member_id = m.id WHERE m.active = 1 ORDER BY m.created_at, m.name');
     const statuses = await all(db, `SELECT * FROM attendance WHERE event_id IN (${events.map(() => '?').join(',')})`, ...events.map(e => e.id));
     const pending = events.map(l => ({ live: l, names: members.filter(m => {
       const record = statuses.find(a => a.event_id === l.id && a.member_id === m.id);
@@ -613,7 +618,7 @@ async function lineBody(db, events, mode, mentions = null) {
     if (!pending.length) return done('【本日締切】\n申込状況の未確認はありません。');
     for (const item of pending) {
       const before = mentioned, keys = Object.keys(substitution).length;
-      if (!add([...lineEventLines(item.live, v2), '未確認：' + item.names.map(nameOf).join('、')].join('\n'))) {
+      if (!add([...lineEventLines(item.live, v2), '未確認：' + item.names.map(m => nameOf(m, item.live)).join('、')].join('\n'))) {
         // Drop the mentions created for a block that did not fit.
         Object.keys(substitution).slice(keys).forEach(k => delete substitution[k]); mentioned = before;
         break;
@@ -769,7 +774,7 @@ async function linkLineAccount(env, event, now = Date.now()) {
     db.prepare('DELETE FROM line_link_codes WHERE member_id = ?').bind(row.member_id),
     db.prepare('DELETE FROM line_link_failures WHERE user_id = ?').bind(userId),
   ]);
-  return lineReply(env, event.replyToken, row.name + 'さんのLINEを連携しました ✓\n21時の通知で、申込状況が未確認のイベントがあるときにメンションします。');
+  return lineReply(env, event.replyToken, row.name + 'さんのLINEを連携しました ✓\n夜の通知で、推しグループが出演するイベントの申込状況が未確認の場合にメンションします。');
 }
 async function getLineLink({ db, env, me }, memberId, unlink) {
   sameMember(me, memberId);

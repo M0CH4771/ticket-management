@@ -468,7 +468,7 @@ async function memberAdmin(){
   let members;
   try{members=await rpc('listMembers')}catch(e){notice(e.message);return}
   const active=members.filter(m=>m.active),stopped=members.filter(m=>!m.active);
-  const row=m=>`<li class="admin-member ${m.active?'':'is-stopped'}"><div class="admin-member-main"><strong>${esc(m.name)}</strong>${m.role==='admin'?'<span class="role-badge">管理者</span>':''}${m.active?'':'<span class="flag">停止中</span>'}${m.isMe?'<span class="muted">（自分）</span>':''}<span class="admin-member-email">${m.email?esc(m.email):'Googleアカウント未設定（ログインできません）'}</span></div><button type="button" data-edit-member="${esc(m.id)}">編集</button></li>`;
+  const row=m=>`<li class="admin-member ${m.active?'':'is-stopped'}"><div class="admin-member-main"><strong>${esc(m.name)}</strong>${m.role==='admin'?'<span class="role-badge">管理者</span>':''}${m.active?'':'<span class="flag">停止中</span>'}${m.isMe?'<span class="muted">（自分）</span>':''}<span class="admin-member-email">${m.email?esc(m.email):'Googleアカウント未設定（ログインできません）'}</span><span class="admin-member-email">推しグループ：${esc((m.groups||[]).join('、')||'未設定')}</span></div><button type="button" data-edit-member="${esc(m.id)}">編集</button></li>`;
   modal('メンバー管理',`<p class="muted">ここに登録したGoogleアカウントだけがログインできます。</p><button type="button" class="primary manager-add" id="member-add">＋ メンバーを追加</button>
   <h3 class="admin-heading">利用中 <span class="muted">${active.length}人</span></h3><ul class="admin-members">${active.map(row).join('')||'<li class="muted">まだいません</li>'}</ul>
   ${stopped.length?`<h3 class="admin-heading">停止中 <span class="muted">${stopped.length}人</span></h3><ul class="admin-members">${stopped.map(row).join('')}</ul>`:''}
@@ -497,13 +497,15 @@ async function memberAdmin(){
 }
 function memberForm(m={}){
   managerLiveId='';managerMode='';
+  const available=[...new Set([...(data.groups||[]),...(m.groups||[])])].sort((a,b)=>a.localeCompare(b,'ja'));
   modal(m.id?'メンバーを編集':'メンバーを追加',field('名前','name',m.name,'text',true)+field('Googleアカウント（メールアドレス）','email',m.email,'email',true)+
     `<label for="f-role">権限</label><select id="f-role" name="role"><option value="member" ${m.role!=='admin'?'selected':''}>メンバー</option><option value="admin" ${m.role==='admin'?'selected':''}>管理者</option></select>`+
+    `<fieldset><legend>推しグループ（複数選択）</legend><div class="group-options">${available.map(g=>`<label class="group-choice"><input type="checkbox" name="member-group" value="${esc(g)}" ${(m.groups||[]).includes(g)?'checked':''}>${esc(g)}</label>`).join('')||'<span class="muted">イベントに出演グループを登録すると選択できます。</span>'}</div><p class="muted form-hint">夜のLINE配信では、選択したグループが出演する締切イベントの申込状況が未確認の場合のみメンションされます。未設定の場合はメンションされません。</p></fieldset>`+
     (m.id?`<label class="duplicate-ack"><input type="checkbox" name="active" ${m.active!==false?'checked':''}>利用中（外すとログインできなくなります）</label>`:'')+
     (m.isMe?'<p class="muted form-hint">自分自身の権限と利用状態は変更できません。</p>':''),
     async p=>{
       if(busy)return;busy=true;$('submit-save').disabled=true;
-      try{await rpc('saveMember',{id:m.id,name:p.name,email:p.email,role:m.isMe?m.role:p.role,active:m.isMe||!m.id?true:p.active==='on'});busy=false;modalDirty=false;notice(m.id?'メンバー情報を保存しました':'メンバーを追加しました');memberAdmin()}
+      try{const groups=[...document.querySelectorAll('#form input[name="member-group"]:checked')].map(el=>el.value);await rpc('saveMember',{id:m.id,name:p.name,email:p.email,role:m.isMe?m.role:p.role,active:m.isMe||!m.id?true:p.active==='on',groups});busy=false;modalDirty=false;notice(m.id?'メンバー情報を保存しました':'メンバーを追加しました');memberAdmin()}
       catch(e){busy=false;$('submit-save').disabled=false;const message=$('form-message');if(message)message.textContent=e.message}
     });
   $('cancel').textContent='← メンバー一覧';$('cancel').onclick=()=>{if(modalDirty&&!confirm('入力中の内容を破棄して戻りますか？'))return;memberAdmin()};
@@ -785,10 +787,10 @@ async function lineLinkSettings(){
     const box=document.createElement('div');box.id='line-link-body';box.className='line-link';
     if(!state.configured){box.innerHTML='<p>LINEグループへの通知が設定されていないため、まだ使えません。管理者に連絡してください。</p>'}
     else if(state.linked){
-      box.innerHTML=`<p class="line-link-done">✓ LINEと連携しています</p><p>21時の通知で、申込状況が未確認のイベントがあるときに、あなたにメンションが届きます。</p><p class="muted">連携した日：${esc(new Date(state.linkedAt).toLocaleDateString('ja-JP'))}<br>別のLINEアカウントに変えるときは、いったん解除してからもう一度連携してください。</p><button type="button" id="line-unlink" class="danger">連携を解除</button>`;
+      box.innerHTML=`<p class="line-link-done">✓ LINEと連携しています</p><p>夜の通知で、推しグループが出演するイベントの申込状況が未確認の場合にメンションが届きます。推しグループの設定は管理者に依頼してください。</p><p class="muted">連携した日：${esc(new Date(state.linkedAt).toLocaleDateString('ja-JP'))}<br>別のLINEアカウントに変えるときは、いったん解除してからもう一度連携してください。</p><button type="button" id="line-unlink" class="danger">連携を解除</button>`;
     }else{
       const text='連携 '+state.code;
-      box.innerHTML=`<p>21時の通知で、申込状況が未確認のときにあなたへメンションが届くようになります。</p>
+      box.innerHTML=`<p>夜の通知で、推しグループが出演するイベントの申込状況が未確認の場合にメンションが届きます。推しグループの設定は管理者に依頼してください。</p>
       <ol class="admin-steps"><li>下の<b>コピー</b>を押します。</li><li>通知が届いている<b>LINEグループ</b>に貼り付けて送ります。</li><li>ボットから「連携しました」と返信が来たら完了です。</li></ol>
       <div class="line-code"><code>${esc(text)}</code><button type="button" class="primary" id="line-code-copy">コピー</button></div>
       <p class="muted">このコードは${esc(hhmm(state.expiresAt))}まで使えます。人に送らないでください。</p>
